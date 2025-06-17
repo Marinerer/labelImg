@@ -40,7 +40,7 @@ class Canvas(QWidget):
         self.mode = self.EDIT
         self.shapes = []
         self.current = None
-        self.selected_shape = None  # save the selected shape here
+        self.selected_shapes = []  # save the selected shapes here as an array
         self.selected_shape_copy = None
         self.drawing_line_color = QColor(0, 0, 255)
         self.drawing_rect_color = QColor(0, 0, 255)
@@ -68,6 +68,9 @@ class Canvas(QWidget):
 
         # initialisation for panning
         self.pan_initial_pos = QPoint()
+        
+        # !For compatibility with existing code
+        self._selected_shape = None
 
     def set_drawing_color(self, qcolor):
         self.drawing_line_color = qcolor
@@ -170,8 +173,9 @@ class Canvas(QWidget):
                 self.override_cursor(CURSOR_MOVE)
                 self.bounded_move_shape(self.selected_shape_copy, pos)
                 self.repaint()
-            elif self.selected_shape:
-                self.selected_shape_copy = self.selected_shape.copy()
+            elif self.selected_shapes:
+                # Create a copy of the first selected shape
+                self.selected_shape_copy = self.selected_shapes[0].copy() if self.selected_shapes else None
                 self.repaint()
             return
 
@@ -189,19 +193,24 @@ class Canvas(QWidget):
                 current_height = abs(point1.y() - point3.y())
                 self.parent().window().label_coordinates.setText(
                         'Width: %d, Height: %d / X: %d; Y: %d' % (current_width, current_height, pos.x(), pos.y()))
-            elif self.selected_shape and self.prev_point:
+            elif self.selected_shapes and self.prev_point:
                 self.override_cursor(CURSOR_MOVE)
-                self.bounded_move_shape(self.selected_shape, pos)
+                # Use the first selected shape for bounded_move_shape
+                # The method will handle moving all selected shapes if needed
+                if self.selected_shapes:
+                    self.bounded_move_shape(self.selected_shapes[0], pos)
                 self.shapeMoved.emit()
                 self.repaint()
 
                 # Display annotation width and height while moving shape
-                point1 = self.selected_shape[1]
-                point3 = self.selected_shape[3]
-                current_width = abs(point1.x() - point3.x())
-                current_height = abs(point1.y() - point3.y())
-                self.parent().window().label_coordinates.setText(
-                        'Width: %d, Height: %d / X: %d; Y: %d' % (current_width, current_height, pos.x(), pos.y()))
+                # Use the first selected shape for display
+                if self.selected_shapes:
+                    point1 = self.selected_shapes[0][1]
+                    point3 = self.selected_shapes[0][3]
+                    current_width = abs(point1.x() - point3.x())
+                    current_height = abs(point1.y() - point3.y())
+                    self.parent().window().label_coordinates.setText(
+                            'Width: %d, Height: %d / X: %d; Y: %d' % (current_width, current_height, pos.x(), pos.y()))
             else:
                 # pan
                 delta = ev.pos() - self.pan_initial_pos
@@ -262,15 +271,18 @@ class Canvas(QWidget):
             if self.drawing():
                 self.handle_drawing(pos)
             else:
-                selection = self.select_shape_point(pos)
+                # Check if Shift key is pressed for multi-selection
+                multi_select = ev.modifiers() & Qt.ShiftModifier
+                selection = self.select_shape_point(pos, multi_select)
                 self.prev_point = pos
 
-                if selection is None:
+                if selection is None and not multi_select:
                     # pan
                     QApplication.setOverrideCursor(QCursor(Qt.OpenHandCursor))
                     self.pan_initial_pos = ev.pos()
 
         elif ev.button() == Qt.RightButton and self.editing():
+            # Right click doesn't support multi-select
             self.select_shape_point(pos)
             self.prev_point = pos
         self.update()
@@ -284,7 +296,7 @@ class Canvas(QWidget):
                 # Cancel the move by deleting the shadow copy.
                 self.selected_shape_copy = None
                 self.repaint()
-        elif ev.button() == Qt.LeftButton and self.selected_shape:
+        elif ev.button() == Qt.LeftButton and self.selected_shapes:
             if self.selected_vertex():
                 self.override_cursor(CURSOR_POINT)
             else:
@@ -298,22 +310,28 @@ class Canvas(QWidget):
                 QApplication.restoreOverrideCursor()
 
     def end_move(self, copy=False):
-        assert self.selected_shape and self.selected_shape_copy
+        assert self.selected_shapes and self.selected_shape_copy
         shape = self.selected_shape_copy
         # del shape.fill_color
         # del shape.line_color
         if copy:
             self.shapes.append(shape)
-            self.selected_shape.selected = False
-            self.selected_shape = shape
+            # Deselect all shapes
+            for s in self.selected_shapes:
+                s.selected = False
+            self.selected_shapes = [shape]
+            self._selected_shape = shape
+            shape.selected = True
             self.repaint()
         else:
-            self.selected_shape.points = [p for p in shape.points]
+            # Only move the first selected shape
+            if self.selected_shapes:
+                self.selected_shapes[0].points = [p for p in shape.points]
         self.selected_shape_copy = None
 
     def hide_background_shapes(self, value):
         self.hide_background = value
-        if self.selected_shape:
+        if self.selected_shapes:
             # Only hide other shapes if there is a current selection.
             # Otherwise the user will not be able to select a shape.
             self.set_hiding(True)
@@ -352,27 +370,50 @@ class Canvas(QWidget):
             self.current.pop_point()
             self.finalise()
 
-    def select_shape(self, shape):
-        self.de_select_shape()
-        shape.selected = True
-        self.selected_shape = shape
-        self.set_hiding()
-        self.selectionChanged.emit(True)
-        self.update()
+    @property
+    def selected_shape(self):
+        """For backward compatibility. Returns the first selected shape."""
+        return self._selected_shape
+        
+    @selected_shape.setter
+    def selected_shape(self, shape):
+        """For backward compatibility. Sets the first selected shape."""
+        self.selected_shapes = [shape] if shape else []
+        self._selected_shape = shape
+        
+    def select_shape(self, shape, multi_select=False):
+        """Select shape. If multi_select is True, add to selection instead of replacing."""
+        if not multi_select:
+            self.de_select_shape()
+        
+        if shape not in self.selected_shapes:
+            shape.selected = True
+            self.selected_shapes.append(shape)
+            self._selected_shape = self.selected_shapes[0] if self.selected_shapes else None
+            self.set_hiding()
+            self.selectionChanged.emit(bool(self.selected_shapes))
+            self.update()
 
-    def select_shape_point(self, point):
+    def select_shape_point(self, point, multi_select=False):
         """Select the first shape created which contains this point."""
-        self.de_select_shape()
+        if not multi_select:
+            self.de_select_shape()
+            
         if self.selected_vertex():  # A vertex is marked for selection.
             index, shape = self.h_vertex, self.h_shape
             shape.highlight_vertex(index, shape.MOVE_VERTEX)
-            self.select_shape(shape)
+            self.select_shape(shape, multi_select)
             return self.h_vertex
+            
         for shape in reversed(self.shapes):
             if self.isVisible(shape) and shape.contains_point(point):
-                self.select_shape(shape)
-                self.calculate_offsets(shape, point)
-                return self.selected_shape
+                # If multi-selecting and shape is already selected, deselect it
+                if multi_select and shape in self.selected_shapes:
+                    self.de_select_shape(shape)
+                else:
+                    self.select_shape(shape, multi_select)
+                    self.calculate_offsets(shape, point)
+                return shape if shape in self.selected_shapes else None
         return None
 
     def calculate_offsets(self, shape, point):
@@ -450,47 +491,81 @@ class Canvas(QWidget):
         # self.calculateOffsets(self.selectedShape, pos)
         dp = pos - self.prev_point
         if dp:
-            shape.move_by(dp)
+            # If this is one of the selected shapes and we have multiple shapes selected,
+            # move all selected shapes
+            if shape.selected and len(self.selected_shapes) > 1 and shape in self.selected_shapes:
+                for s in self.selected_shapes:
+                    s.move_by(dp)
+            else:
+                shape.move_by(dp)
+                
             self.prev_point = pos
             return True
         return False
 
-    def de_select_shape(self):
-        if self.selected_shape:
-            self.selected_shape.selected = False
-            self.selected_shape = None
+    def de_select_shape(self, shape=None):
+        """Deselect shape. If shape is None, deselect all shapes."""
+        if shape is None:
+            for shape in self.selected_shapes:
+                shape.selected = False
+            self.selected_shapes = []
+            self._selected_shape = None
             self.set_hiding(False)
             self.selectionChanged.emit(False)
             self.update()
+        elif shape in self.selected_shapes:
+            shape.selected = False
+            self.selected_shapes.remove(shape)
+            self._selected_shape = self.selected_shapes[0] if self.selected_shapes else None
+            self.selectionChanged.emit(bool(self.selected_shapes))
+            self.update()
 
     def delete_selected(self):
-        if self.selected_shape:
-            shape = self.selected_shape
+        if not self.selected_shapes:
+            return None
+            
+        deleted_shapes = []
+        for shape in self.selected_shapes.copy():  # Use copy to safely iterate while removing
             self.un_highlight(shape)
-            self.shapes.remove(self.selected_shape)
-            self.selected_shape = None
-            self.update()
-            return shape
+            self.shapes.remove(shape)
+            deleted_shapes.append(shape)
+            
+        self.selected_shapes = []
+        self._selected_shape = None
+        self.update()
+        return deleted_shapes
 
     def copy_selected_shape(self):
-        if self.selected_shape:
-            shape = self.selected_shape.copy()
-            self.de_select_shape()
-            self.shapes.append(shape)
-            shape.selected = True
-            self.selected_shape = shape
-            self.bounded_shift_shape(shape)
-            return shape
+        if not self.selected_shapes:
+            return
+            
+        copied_shapes = []
+        for shape in self.selected_shapes:
+            copied_shape = shape.copy()
+            self.shapes.append(copied_shape)
+            copied_shape.selected = True
+            copied_shapes.append(copied_shape)
+            
+        self.de_select_shape()  # Deselect all shapes
+        
+        # Select all copied shapes
+        self.selected_shapes = copied_shapes
+        if copied_shapes:  # For backward compatibility
+            self._selected_shape = copied_shapes[0]
+            self.bounded_shift_shape(self._selected_shape)
+            
+        self.update()
+        return self._selected_shape if copied_shapes else None
 
     def bounded_shift_shape(self, shape):
-        # Try to move in one direction, and if it fails in another.
-        # Give up if both fail.
+        # Try to move in one direction, and if it fails in another
         point = shape[0]
         offset = QPointF(2.0, 2.0)
         self.calculate_offsets(shape, point)
         self.prev_point = point
-        if not self.bounded_move_shape(shape, point - offset):
-            self.bounded_move_shape(shape, point + offset)
+        if self.bounded_move_shape(shape, point - offset):
+            return
+        self.bounded_move_shape(shape, point + offset)
 
     def paintEvent(self, event):
         if not self.pixmap:
@@ -635,47 +710,67 @@ class Canvas(QWidget):
             self.update()
         elif key == Qt.Key_Return and self.can_close_shape():
             self.finalise()
-        elif key == Qt.Key_Left and self.selected_shape:
+        elif key == Qt.Key_Left and self.selected_shapes:
             self.move_one_pixel('Left')
-        elif key == Qt.Key_Right and self.selected_shape:
+        elif key == Qt.Key_Right and self.selected_shapes:
             self.move_one_pixel('Right')
-        elif key == Qt.Key_Up and self.selected_shape:
+        elif key == Qt.Key_Up and self.selected_shapes:
             self.move_one_pixel('Up')
-        elif key == Qt.Key_Down and self.selected_shape:
+        elif key == Qt.Key_Down and self.selected_shapes:
             self.move_one_pixel('Down')
 
     def move_one_pixel(self, direction):
-        # print(self.selectedShape.points)
-        if direction == 'Left' and not self.move_out_of_bound(QPointF(-1.0, 0)):
-            # print("move Left one pixel")
-            self.selected_shape.points[0] += QPointF(-1.0, 0)
-            self.selected_shape.points[1] += QPointF(-1.0, 0)
-            self.selected_shape.points[2] += QPointF(-1.0, 0)
-            self.selected_shape.points[3] += QPointF(-1.0, 0)
-        elif direction == 'Right' and not self.move_out_of_bound(QPointF(1.0, 0)):
-            # print("move Right one pixel")
-            self.selected_shape.points[0] += QPointF(1.0, 0)
-            self.selected_shape.points[1] += QPointF(1.0, 0)
-            self.selected_shape.points[2] += QPointF(1.0, 0)
-            self.selected_shape.points[3] += QPointF(1.0, 0)
-        elif direction == 'Up' and not self.move_out_of_bound(QPointF(0, -1.0)):
-            # print("move Up one pixel")
-            self.selected_shape.points[0] += QPointF(0, -1.0)
-            self.selected_shape.points[1] += QPointF(0, -1.0)
-            self.selected_shape.points[2] += QPointF(0, -1.0)
-            self.selected_shape.points[3] += QPointF(0, -1.0)
-        elif direction == 'Down' and not self.move_out_of_bound(QPointF(0, 1.0)):
-            # print("move Down one pixel")
-            self.selected_shape.points[0] += QPointF(0, 1.0)
-            self.selected_shape.points[1] += QPointF(0, 1.0)
-            self.selected_shape.points[2] += QPointF(0, 1.0)
-            self.selected_shape.points[3] += QPointF(0, 1.0)
-        self.shapeMoved.emit()
-        self.repaint()
+        if not self.selected_shapes:
+            return
+            
+        # Check if any selected shape would move out of bounds
+        move_out_of_bounds = False
+        offset = None
+        
+        if direction == 'Left':
+            offset = QPointF(-1.0, 0)
+        elif direction == 'Right':
+            offset = QPointF(1.0, 0)
+        elif direction == 'Up':
+            offset = QPointF(0, -1.0)
+        elif direction == 'Down':
+            offset = QPointF(0, 1.0)
+            
+        if offset is None:
+            return
+            
+        # Check if any shape would move out of bounds
+        for shape in self.selected_shapes:
+            points = [p + offset for p in shape.points]
+            if any(self.out_of_pixmap(p) for p in points):
+                move_out_of_bounds = True
+                break
+                
+        if not move_out_of_bounds:
+            # Move all selected shapes
+            for shape in self.selected_shapes:
+                for i in range(len(shape.points)):
+                    shape.points[i] += offset
+                    
+            self.shapeMoved.emit()
+            self.repaint()
 
     def move_out_of_bound(self, step):
-        points = [p1 + p2 for p1, p2 in zip(self.selected_shape.points, [step] * 4)]
-        return True in map(self.out_of_pixmap, points)
+        if not self.selected_shapes:
+            return False
+            
+        # For backward compatibility, check if we're using the old selected_shape property
+        if self._selected_shape is not None:
+            points = [p1 + p2 for p1, p2 in zip(self._selected_shape.points, [step] * 4)]
+            return True in map(self.out_of_pixmap, points)
+            
+        # Check all selected shapes
+        for shape in self.selected_shapes:
+            points = [p1 + p2 for p1, p2 in zip(shape.points, [step] * 4)]
+            if True in map(self.out_of_pixmap, points):
+                return True
+                
+        return False
 
     def set_last_label(self, text, line_color=None, fill_color=None):
         assert text

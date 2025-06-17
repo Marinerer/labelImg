@@ -1573,9 +1573,10 @@ class MainWindow(QMainWindow, WindowMixin):
             self.set_dirty()
 
     def delete_selected_shape(self):
-        deleted_shape = self.canvas.delete_selected()
-        if deleted_shape:
-            self.remove_label(deleted_shape)
+        deleted_shapes = self.canvas.delete_selected()
+        if deleted_shapes:
+            for deleted_shape in deleted_shapes:
+                self.remove_label(deleted_shape)
             self.set_dirty()
             if self.no_shapes():
                 for action in self.actions.onShapesPresent:
@@ -1585,7 +1586,8 @@ class MainWindow(QMainWindow, WindowMixin):
         color = self.color_dialog.getColor(self.line_color, u'Choose Line Color',
                                            default=DEFAULT_LINE_COLOR)
         if color:
-            self.canvas.selected_shape.line_color = color
+            for shape in self.canvas.selected_shapes:
+                shape.line_color = color
             self.canvas.update()
             self.set_dirty()
 
@@ -1593,7 +1595,8 @@ class MainWindow(QMainWindow, WindowMixin):
         color = self.color_dialog.getColor(self.fill_color, u'Choose Fill Color',
                                            default=DEFAULT_FILL_COLOR)
         if color:
-            self.canvas.selected_shape.fill_color = color
+            for shape in self.canvas.selected_shapes:
+                shape.fill_color = color
             self.canvas.update()
             self.set_dirty()
 
