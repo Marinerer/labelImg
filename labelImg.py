@@ -1573,11 +1573,13 @@ class MainWindow(QMainWindow, WindowMixin):
             self.set_dirty()
 
     def delete_selected_shape(self):
-        self.remove_label(self.canvas.delete_selected())
-        self.set_dirty()
-        if self.no_shapes():
-            for action in self.actions.onShapesPresent:
-                action.setEnabled(False)
+        deleted_shape = self.canvas.delete_selected()
+        if deleted_shape:
+            self.remove_label(deleted_shape)
+            self.set_dirty()
+            if self.no_shapes():
+                for action in self.actions.onShapesPresent:
+                    action.setEnabled(False)
 
     def choose_shape_line_color(self):
         color = self.color_dialog.getColor(self.line_color, u'Choose Line Color',
@@ -1706,7 +1708,14 @@ class MainWindow(QMainWindow, WindowMixin):
             
             # 如果有上一张图片，复制其标注数据
             if current_file_path is not None:
+                # 保存当前画布上的形状
+                current_shapes = self.canvas.shapes.copy()
+                
+                # 加载上一张图片的标注数据
                 self.show_bounding_box_from_annotation_file(current_file_path)
+                
+                # 将当前画布上的形状与新加载的形状合并
+                self.canvas.shapes.extend(current_shapes)
                 self.set_dirty()
                 
 def inverted(color):
