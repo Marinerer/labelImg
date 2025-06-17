@@ -69,6 +69,11 @@ class Canvas(QWidget):
         # initialisation for panning
         self.pan_initial_pos = QPoint()
         
+        # initialisation for selection box
+        self.selection_box_enabled = False
+        self.selection_box_start = QPoint()
+        self.selection_box_end = QPoint()
+        
         # !For compatibility with existing code
         self._selected_shape = None
 
@@ -179,6 +184,12 @@ class Canvas(QWidget):
                 self.repaint()
             return
 
+        # Selection box drawing
+        if self.selection_box_enabled and Qt.LeftButton & ev.buttons():
+            self.selection_box_end = pos
+            self.update()
+            return
+
         # Polygon/Vertex moving.
         if Qt.LeftButton & ev.buttons():
             if self.selected_vertex():
@@ -271,15 +282,22 @@ class Canvas(QWidget):
             if self.drawing():
                 self.handle_drawing(pos)
             else:
-                # Check if Shift key is pressed for multi-selection
-                multi_select = ev.modifiers() & Qt.ShiftModifier
-                selection = self.select_shape_point(pos, multi_select)
-                self.prev_point = pos
+                # Check if Shift key is pressed for selection box
+                if ev.modifiers() & Qt.ShiftModifier:
+                    self.selection_box_enabled = True
+                    self.selection_box_start = pos
+                    self.selection_box_end = pos
+                    self.update()
+                else:
+                    # Check if Ctrl key is pressed for multi-selection
+                    multi_select = ev.modifiers() & Qt.ControlModifier
+                    selection = self.select_shape_point(pos, multi_select)
+                    self.prev_point = pos
 
-                if selection is None and not multi_select:
-                    # pan
-                    QApplication.setOverrideCursor(QCursor(Qt.OpenHandCursor))
-                    self.pan_initial_pos = ev.pos()
+                    if selection is None and not multi_select:
+                        # pan
+                        QApplication.setOverrideCursor(QCursor(Qt.OpenHandCursor))
+                        self.pan_initial_pos = ev.pos()
 
         elif ev.button() == Qt.RightButton and self.editing():
             # Right click doesn't support multi-select
@@ -288,6 +306,13 @@ class Canvas(QWidget):
         self.update()
 
     def mouseReleaseEvent(self, ev):
+        if ev.button() == Qt.LeftButton and self.selection_box_enabled:
+            # Finish selection box
+            self.finish_selection_box()
+            self.selection_box_enabled = False
+            self.update()
+            return
+            
         if ev.button() == Qt.RightButton:
             menu = self.menus[bool(self.selected_shape_copy)]
             self.restore_cursor()
@@ -308,6 +333,29 @@ class Canvas(QWidget):
             else:
                 # pan
                 QApplication.restoreOverrideCursor()
+
+    def finish_selection_box(self):
+        """Select all shapes within the selection box."""
+        # Create selection rectangle
+        min_x = min(self.selection_box_start.x(), self.selection_box_end.x())
+        max_x = max(self.selection_box_start.x(), self.selection_box_end.x())
+        min_y = min(self.selection_box_start.y(), self.selection_box_end.y())
+        max_y = max(self.selection_box_start.y(), self.selection_box_end.y())
+        
+        selection_rect = QRectF(min_x, min_y, max_x - min_x, max_y - min_y)
+        
+        # Clear current selection
+        self.de_select_shape()
+        
+        # Select shapes that intersect with the selection box
+        for shape in self.shapes:
+            if self.isVisible(shape) and self.shape_intersects_rect(shape, selection_rect):
+                self.select_shape(shape, multi_select=True)
+    
+    def shape_intersects_rect(self, shape, rect):
+        """Check if a shape intersects with a rectangle."""
+        shape_rect = shape.bounding_rect()
+        return rect.intersects(shape_rect)
 
     def end_move(self, copy=False):
         assert self.selected_shapes and self.selected_shape_copy
@@ -611,6 +659,25 @@ class Canvas(QWidget):
             brush = QBrush(Qt.BDiagPattern)
             p.setBrush(brush)
             p.drawRect(int(left_top.x()), int(left_top.y()), int(rect_width), int(rect_height))
+
+        # Paint selection box
+        if self.selection_box_enabled:
+            min_x = min(self.selection_box_start.x(), self.selection_box_end.x())
+            max_x = max(self.selection_box_start.x(), self.selection_box_end.x())
+            min_y = min(self.selection_box_start.y(), self.selection_box_end.y())
+            max_y = max(self.selection_box_start.y(), self.selection_box_end.y())
+            
+            selection_rect = QRectF(min_x, min_y, max_x - min_x, max_y - min_y)
+            
+            # Draw selection box with dashed line
+            pen = QPen(QColor(0, 120, 215), 2)
+            pen.setStyle(Qt.DashLine)
+            p.setPen(pen)
+            
+            # Draw selection box with semi-transparent fill
+            brush = QBrush(QColor(0, 120, 215, 50))
+            p.setBrush(brush)
+            p.drawRect(selection_rect)
 
         if self.drawing() and not self.prev_point.isNull() and not self.out_of_pixmap(self.prev_point):
             p.setPen(QColor(0, 0, 0))
