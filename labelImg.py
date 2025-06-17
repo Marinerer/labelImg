@@ -235,7 +235,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
         open_prev_image = action(get_str('prevImg'), self.open_prev_image,
                                  'a', 'prev', get_str('prevImgDetail'))
-
+        open_next_image_with_copy = action(get_str('nextImgWithCopy'), self.open_next_image_with_copy,
+                                 'Shift+d', 'next', get_str('nextImgWithCopyDetail'))
         verify = action(get_str('verifyImg'), self.verify_image,
                         'space', 'verify', get_str('verifyImgDetail'))
 
@@ -449,12 +450,12 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.tools = self.toolbar('Tools')
         self.actions.beginner = (
-            open, open_dir, change_save_dir, open_next_image, open_prev_image, verify, save, save_format, None, create, copy, delete, None,
+            open, open_dir, change_save_dir, open_next_image, open_prev_image, open_next_image_with_copy, verify, save, save_format, None, create, copy, delete, None,
             zoom_in, zoom, zoom_out, fit_window, fit_width, None,
             light_brighten, light, light_darken, light_org)
 
         self.actions.advanced = (
-            open, open_dir, change_save_dir, open_next_image, open_prev_image, save, save_format, None,
+            open, open_dir, change_save_dir, open_next_image, open_prev_image, open_next_image_with_copy, save, save_format, None,
             create_mode, edit_mode, None,
             hide_all, show_all)
 
@@ -1668,7 +1669,46 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def toggle_draw_square(self):
         self.canvas.set_drawing_shape_to_square(self.draw_squares_option.isChecked())
+    def open_next_image_with_copy(self, _value=False):
+        # 保存当前图片的标注（如果需要）
+        if self.auto_saving.isChecked():
+            if self.default_save_dir is not None:
+                if self.dirty is True:
+                    self.save_file()
+            else:
+                self.change_save_dir_dialog()
+                return
 
+        if not self.may_continue():
+            return
+
+        if self.img_count <= 0:
+            return
+        
+        if not self.m_img_list:
+            return
+
+        # 保存当前图片的路径，用于后续复制标注
+        current_file_path = self.file_path
+        
+        # 切换到下一张图片
+        filename = None
+        if self.file_path is None:
+            filename = self.m_img_list[0]
+            self.cur_img_idx = 0
+        else:
+            if self.cur_img_idx + 1 < self.img_count:
+                self.cur_img_idx += 1
+                filename = self.m_img_list[self.cur_img_idx]
+
+        if filename:
+            self.load_file(filename)
+            
+            # 如果有上一张图片，复制其标注数据
+            if current_file_path is not None:
+                self.show_bounding_box_from_annotation_file(current_file_path)
+                self.set_dirty()
+                
 def inverted(color):
     return QColor(*[255 - v for v in color.getRgb()])
 
