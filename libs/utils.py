@@ -80,7 +80,11 @@ def format_shortcut(text):
 
 
 def generate_color_by_text(text):
+    if text is None:
+        text = ""  # 使用空字符串作为默认值
     s = ustr(text)
+    if s is None:
+        s = ""  # 确保ustr返回值不为None
     hash_code = int(hashlib.sha256(s.encode('utf-8')).hexdigest(), 16)
     r = int((hash_code / 255) % 255)
     g = int((hash_code / 65025) % 255)

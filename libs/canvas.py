@@ -76,6 +76,10 @@ class Canvas(QWidget):
         
         # !For compatibility with existing code
         self._selected_shape = None
+        
+        # History system for undo functionality
+        self.history = []
+        self.max_history_size = 50
 
     def set_drawing_color(self, qcolor):
         self.drawing_line_color = qcolor
@@ -293,6 +297,10 @@ class Canvas(QWidget):
                     multi_select = ev.modifiers() & Qt.ControlModifier
                     selection = self.select_shape_point(pos, multi_select)
                     self.prev_point = pos
+                    
+                    # 如果选中了形状，保存移动前的状态
+                    if selection and self.selected_shapes:
+                        self.save_history_state('move', {'moved_shapes': [shape.copy() for shape in self.selected_shapes]})
 
                     if selection is None and not multi_select:
                         # pan
@@ -571,6 +579,9 @@ class Canvas(QWidget):
     def delete_selected(self):
         if not self.selected_shapes:
             return None
+        
+        # 保存删除前的状态
+        self.save_history_state('delete', {'deleted_shapes': [shape.copy() for shape in self.selected_shapes]})
             
         deleted_shapes = []
         for shape in self.selected_shapes.copy():  # Use copy to safely iterate while removing
@@ -586,6 +597,9 @@ class Canvas(QWidget):
     def copy_selected_shape(self):
         if not self.selected_shapes:
             return
+        
+        # 保存复制前的状态
+        self.save_history_state('copy', {'copied_shapes': [shape.copy() for shape in self.selected_shapes]})
             
         copied_shapes = []
         for shape in self.selected_shapes:
@@ -603,7 +617,7 @@ class Canvas(QWidget):
             self.bounded_shift_shape(self._selected_shape)
             
         self.update()
-        return self._selected_shape if copied_shapes else None
+        return copied_shapes
 
     def bounded_shift_shape(self, shape):
         # Try to move in one direction, and if it fails in another
@@ -908,3 +922,49 @@ class Canvas(QWidget):
 
     def set_drawing_shape_to_square(self, status):
         self.draw_square = status
+    
+    def save_history_state(self, action_type, data=None):
+        """保存当前状态到历史记录"""
+        # 深拷贝当前所有形状
+        shapes_copy = []
+        for shape in self.shapes:
+            shape_copy = shape.copy()
+            shapes_copy.append(shape_copy)
+        
+        history_item = {
+            'action': action_type,
+            'shapes': shapes_copy,
+            'data': data
+        }
+        
+        self.history.append(history_item)
+        
+        # 限制历史记录大小
+        if len(self.history) > self.max_history_size:
+            self.history.pop(0)
+    
+    def undo(self):
+        """撤销上一个操作"""
+        if not self.history:
+            return False
+        
+        # 获取上一个状态
+        last_state = self.history.pop()
+        
+        # 恢复形状列表
+        self.shapes = []
+        for shape in last_state['shapes']:
+            shape_copy = shape.copy()
+            self.shapes.append(shape_copy)
+        
+        # 清除选择状态
+        self.de_select_shape()
+        self.un_highlight()
+        
+        # 更新显示
+        self.update()
+        return True
+    
+    def clear_history(self):
+        """清空历史记录"""
+        self.history = []

@@ -283,6 +283,11 @@ class MainWindow(QMainWindow, WindowMixin):
         copy = action(get_str('dupBox'), self.copy_selected_shape,
                       'Ctrl+D', 'copy', get_str('dupBoxDetail'),
                       enabled=False)
+        
+        undo = action('Undo', self.undo_action,
+                      'Ctrl+Z', 'undo', 'Undo last action',
+                      enabled=False)
+        undo.setIcon(new_icon('undo'))
 
         advanced_mode = action(get_str('advancedMode'), self.toggle_advanced_mode,
                                'Ctrl+Shift+A', 'expert', get_str('advancedModeDetail'),
@@ -393,14 +398,14 @@ class MainWindow(QMainWindow, WindowMixin):
                               fileMenuActions=(
                                   open, open_dir, save, save_as, close, reset_all, quit),
                               beginner=(), advanced=(),
-                              editMenu=(edit, copy, delete,
+                              editMenu=(edit, copy, delete, undo,
                                         None, color1, self.draw_squares_option),
                               beginnerContext=(create, edit, copy, delete),
                               advancedContext=(create_mode, edit_mode, edit, copy,
                                                delete, shape_line_color, shape_fill_color),
                               onLoadActive=(
                                   close, create, create_mode, edit_mode),
-                              onShapesPresent=(save_as, hide_all, show_all))
+                              onShapesPresent=(save_as, hide_all, show_all, undo))
 
         self.menus = Struct(
             file=self.menu(get_str('menu_file')),
@@ -450,13 +455,13 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.tools = self.toolbar('Tools')
         self.actions.beginner = (
-            open, open_dir, change_save_dir, open_next_image, open_prev_image, open_next_image_with_copy, verify, save, save_format, None, create, copy, delete, None,
+            open, open_dir, change_save_dir, open_next_image, open_prev_image, open_next_image_with_copy, verify, save, save_format, None, create, copy, delete, undo, None,
             zoom_in, zoom, zoom_out, fit_window, fit_width, None,
             light_brighten, light, light_darken, light_org)
 
         self.actions.advanced = (
             open, open_dir, change_save_dir, open_next_image, open_prev_image, open_next_image_with_copy, save, save_format, None,
-            create_mode, edit_mode, None,
+            create_mode, edit_mode, undo, None,
             hide_all, show_all)
 
         self.statusBar().showMessage('%s started.' % __appname__)
@@ -756,8 +761,13 @@ class MainWindow(QMainWindow, WindowMixin):
         item = self.current_item()
         if not item:
             return
+        # 保存编辑前的状态
+        self.canvas.save_history_state('edit_label')
         text = self.label_dialog.pop_up(item.text())
         if text is not None:
+            # 更新形状的标签
+            shape = self.items_to_shapes[item]
+            shape.label = text
             item.setText(text)
             item.setBackground(generate_color_by_text(text))
             self.set_dirty()
@@ -815,7 +825,9 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def add_label(self, shape):
         shape.paint_label = self.display_label_option.isChecked()
-        item = HashableQListWidgetItem(shape.label)
+        # 确保标签不为None
+        label_text = shape.label if shape.label is not None else ""
+        item = HashableQListWidgetItem(label_text)
         item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
         item.setCheckState(Qt.Checked)
         item.setBackground(generate_color_by_text(shape.label))
@@ -919,9 +931,27 @@ class MainWindow(QMainWindow, WindowMixin):
             return False
 
     def copy_selected_shape(self):
-        self.add_label(self.canvas.copy_selected_shape())
+        copied_shapes = self.canvas.copy_selected_shape()
+        if copied_shapes:
+            for shape in copied_shapes:
+                self.add_label(shape)
         # fix copy and delete
         self.shape_selection_changed(True)
+    
+    def undo_action(self):
+        """撤销上一个操作"""
+        if self.canvas.undo():
+            # 清空当前标签列表
+            self.label_list.clear()
+            self.items_to_shapes.clear()
+            self.shapes_to_items.clear()
+            
+            # 重新加载形状到标签列表
+            for shape in self.canvas.shapes:
+                self.add_label(shape)
+            
+            self.set_dirty()
+            self.shape_selection_changed(False)
 
     def combo_selection_changed(self, index):
         text = self.combo_box.cb.itemText(index)
@@ -978,6 +1008,9 @@ class MainWindow(QMainWindow, WindowMixin):
         # Add Chris
         self.diffc_button.setChecked(False)
         if text is not None:
+            # 保存创建新形状前的状态
+            self.canvas.save_history_state('create')
+            
             self.prev_label_text = text
             generate_color = generate_color_by_text(text)
             shape = self.canvas.set_last_label(text, generate_color, generate_color)
@@ -1094,6 +1127,8 @@ class MainWindow(QMainWindow, WindowMixin):
     def load_file(self, file_path=None):
         """Load the specified file, or the last opened file if None."""
         self.reset_state()
+        # 清空撤销历史记录
+        self.canvas.clear_history()
         self.canvas.setEnabled(False)
         if file_path is None:
             file_path = self.settings.get(SETTING_FILENAME)
@@ -1179,6 +1214,8 @@ class MainWindow(QMainWindow, WindowMixin):
         return '[{} / {}]'.format(self.cur_img_idx + 1, self.img_count)
 
     def show_bounding_box_from_annotation_file(self, file_path):
+        if file_path is None:
+            return
         if self.default_save_dir is not None:
             basename = os.path.basename(os.path.splitext(file_path)[0])
             xml_path = os.path.join(self.default_save_dir, basename + XML_EXT)
