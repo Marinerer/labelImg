@@ -9,6 +9,16 @@ import sys
 import webbrowser as wb
 from functools import partial
 
+# 获取资源文件路径的函数，兼容打包后的环境
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 try:
     from PyQt5.QtGui import *
     from PyQt5.QtCore import *
@@ -23,6 +33,13 @@ except ImportError:
         sip.setapi('QVariant', 2)
     from PyQt4.QtGui import *
     from PyQt4.QtCore import *
+
+# 添加当前目录到 Python 路径以支持打包环境
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 from libs.combobox import ComboBox
 from libs.default_label_combobox import DefaultLabelComboBox
@@ -113,6 +130,7 @@ class MainWindow(QMainWindow, WindowMixin):
         if self.label_hist:
             self.default_label = self.label_hist[0]
         else:
+            self.default_label = ""  # 设置默认值避免 AttributeError
             print("Not find:/data/predefined_classes.txt (optional)")
 
         # Main widgets and related state.
@@ -1785,7 +1803,7 @@ def get_main_app(argv=None):
     argparser = argparse.ArgumentParser()
     argparser.add_argument("image_dir", nargs="?")
     argparser.add_argument("class_file",
-                           default=os.path.join(os.path.dirname(__file__), "data", "predefined_classes.txt"),
+                           default=resource_path(os.path.join("data", "predefined_classes.txt")),
                            nargs="?")
     argparser.add_argument("save_dir", nargs="?")
     args = argparser.parse_args(argv[1:])
