@@ -620,9 +620,9 @@ class Canvas(QWidget):
         return copied_shapes
 
     def bounded_shift_shape(self, shape):
-        # Try to move in one direction, and if it fails in another
+        # No offset for copied shapes - keep them in the same position
         point = shape[0]
-        offset = QPointF(2.0, 2.0)
+        offset = QPointF(0.0, 0.0)  # 去掉复制后偏移 Changed from (2.0, 2.0) to (0.0, 0.0)
         self.calculate_offsets(shape, point)
         self.prev_point = point
         if self.bounded_move_shape(shape, point - offset):
@@ -784,11 +784,21 @@ class Canvas(QWidget):
 
     def keyPressEvent(self, ev):
         key = ev.key()
-        if key == Qt.Key_Escape and self.current:
-            print('ESC press')
-            self.current = None
-            self.drawingPolygon.emit(False)
-            self.update()
+        if key == Qt.Key_Escape:
+            if self.current:
+                print('ESC press')
+                self.current = None
+                self.drawingPolygon.emit(False)
+                self.update()
+            elif self.drawing():
+                # 绘制状态喜下，Esc则取消 Cancel creation mode when ESC is pressed in CREATE mode
+                print('ESC press - Cancel creation mode')
+                self.set_editing(True)
+                # Re-enable create action for beginner mode
+                window = self.parent().window()
+                if hasattr(window, 'actions') and hasattr(window.actions, 'create'):
+                    window.actions.create.setEnabled(True)
+                self.update()
         elif key == Qt.Key_Return and self.can_close_shape():
             self.finalise()
         elif key == Qt.Key_Left and self.selected_shapes:
