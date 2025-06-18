@@ -1577,7 +1577,28 @@ class MainWindow(QMainWindow, WindowMixin):
         if delete_path is not None:
             idx = self.cur_img_idx
             if os.path.exists(delete_path):
+                # 删除图片文件
                 os.remove(delete_path)
+                
+                # 删除对应的标注文件
+                if self.default_save_dir is not None:
+                    # 如果设置了默认保存目录，在该目录下查找标注文件
+                    basename = os.path.basename(os.path.splitext(delete_path)[0])
+                    xml_path = os.path.join(self.default_save_dir, basename + XML_EXT)
+                    txt_path = os.path.join(self.default_save_dir, basename + TXT_EXT)
+                    json_path = os.path.join(self.default_save_dir, basename + JSON_EXT)
+                else:
+                    # 在图片文件同目录下查找标注文件
+                    xml_path = os.path.splitext(delete_path)[0] + XML_EXT
+                    txt_path = os.path.splitext(delete_path)[0] + TXT_EXT
+                    json_path = os.path.splitext(delete_path)[0] + JSON_EXT
+                
+                # 删除存在的标注文件
+                for annotation_path in [xml_path, txt_path, json_path]:
+                    if os.path.exists(annotation_path):
+                        os.remove(annotation_path)
+                        print('Deleted annotation file: {}'.format(annotation_path))
+                        
             self.import_dir_images(self.last_open_dir)
             if self.img_count > 0:
                 self.cur_img_idx = min(idx, self.img_count - 1)
