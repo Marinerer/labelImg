@@ -12,7 +12,7 @@ except ImportError:
 from libs.utils import distance
 import sys
 
-DEFAULT_LINE_COLOR = QColor(0, 255, 0, 20)  # 边框颜色 Reduced alpha from 128 to 80
+DEFAULT_LINE_COLOR = QColor(0, 255, 0, 255)  # 边框颜色 - 不透明的亮绿色
 DEFAULT_FILL_COLOR = QColor(255, 0, 0, 128)
 DEFAULT_SELECT_LINE_COLOR = QColor(255, 255, 255)
 DEFAULT_SELECT_FILL_COLOR = QColor(0, 128, 255, 155)

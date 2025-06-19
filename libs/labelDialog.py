@@ -39,6 +39,8 @@ class LabelDialog(QDialog):
 
         if list_item is not None and len(list_item) > 0:
             self.list_widget = QListWidget(self)
+            # 设置为多选模式
+            self.list_widget.setSelectionMode(QAbstractItemView.MultiSelection)
             for item in list_item:
                 self.list_widget.addItem(item)
             self.list_widget.itemClicked.connect(self.list_item_click)
@@ -49,6 +51,9 @@ class LabelDialog(QDialog):
 
     def validate(self):
         if trimmed(self.edit.text()):
+            # 提交前重置标签控件状态
+            if hasattr(self, 'list_widget'):
+                self.list_widget.clearSelection()
             self.accept()
 
     def post_process(self):
@@ -60,6 +65,10 @@ class LabelDialog(QDialog):
         If the user entered a label, that label is returned, otherwise (i.e. if the user cancelled the action)
         `None` is returned.
         """
+        # 重置标签控件状态
+        if hasattr(self, 'list_widget'):
+            self.list_widget.clearSelection()
+        
         self.edit.setText(text)
         self.edit.setSelection(0, len(text))
         self.edit.setFocus(Qt.PopupFocusReason)
@@ -87,8 +96,16 @@ class LabelDialog(QDialog):
         return trimmed(self.edit.text()) if self.exec_() else None
 
     def list_item_click(self, t_qlist_widget_item):
-        text = trimmed(t_qlist_widget_item.text())
-        self.edit.setText(text)
+        # 获取所有选中的项目
+        selected_items = self.list_widget.selectedItems()
+        if selected_items:
+            # 将多个选中的标签用逗号分隔
+            selected_texts = [trimmed(item.text()) for item in selected_items]
+            combined_text = ', '.join(selected_texts)
+            self.edit.setText(combined_text)
+        else:
+            # 如果没有选中项，清空编辑框
+            self.edit.setText('')
 
     def list_item_double_click(self, t_qlist_widget_item):
         self.list_item_click(t_qlist_widget_item)

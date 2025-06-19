@@ -79,17 +79,26 @@ def format_shortcut(text):
     return '<b>%s</b>+<b>%s</b>' % (mod, key)
 
 
-def generate_color_by_text(text):
+def generate_color_by_text(text, alpha=100):
     if text is None:
         text = ""  # 使用空字符串作为默认值
-    s = ustr(text)
+    
+    # 支持多标签（逗号分隔）
+    if ',' in text:
+        # 对于多标签，使用第一个标签生成主要颜色
+        labels = [label.strip() for label in text.split(',')]
+        primary_label = labels[0] if labels else ""
+        s = ustr(primary_label)
+    else:
+        s = ustr(text)
+    
     if s is None:
         s = ""  # 确保ustr返回值不为None
     hash_code = int(hashlib.sha256(s.encode('utf-8')).hexdigest(), 16)
     r = int((hash_code / 255) % 255)
     g = int((hash_code / 65025) % 255)
     b = int((hash_code / 16581375) % 255)
-    return QColor(r, g, b, 100)
+    return QColor(r, g, b, alpha)
 
 
 def have_qstring():

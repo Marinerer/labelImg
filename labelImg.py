@@ -783,11 +783,47 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas.save_history_state('edit_label')
         text = self.label_dialog.pop_up(item.text())
         if text is not None:
-            # 更新形状的标签
-            shape = self.items_to_shapes[item]
-            shape.label = text
-            item.setText(text)
-            item.setBackground(generate_color_by_text(text))
+            # 获取原始形状
+            original_shape = self.items_to_shapes[item]
+            
+            # 检查是否为多标签
+            if ',' in text:
+                # 多标签：为每个标签创建一个形状
+                labels = [label.strip() for label in text.split(',')]
+                original_points = original_shape.points.copy()  # 保存原始坐标
+                
+                # 先删除原始形状和列表项
+                self.canvas.shapes.remove(original_shape)
+                self.remove_label(original_shape)
+                
+                # 为每个标签创建新形状
+                for i, label in enumerate(labels):
+                    if label:  # 确保标签不为空
+                        from libs.shape import Shape, DEFAULT_LINE_COLOR
+                        new_shape = Shape(label=label, line_color=DEFAULT_LINE_COLOR)
+                        new_shape.points = original_points.copy()  # 使用相同坐标
+                        new_shape.fill_color = generate_color_by_text(label)
+                        new_shape.close()
+                        self.canvas.shapes.append(new_shape)
+                        self.add_label(new_shape)
+                        
+                        # 添加到历史记录
+                        if label not in self.label_hist:
+                            self.label_hist.append(label)
+            else:
+                # 单标签：更新现有形状
+                original_shape.label = text
+                # 使用固定的亮绿色边框
+                from libs.shape import DEFAULT_LINE_COLOR
+                original_shape.line_color = DEFAULT_LINE_COLOR
+                original_shape.fill_color = generate_color_by_text(text)
+                item.setText(text)
+                item.setBackground(generate_color_by_text(text))
+                
+                # 添加到历史记录
+                if text not in self.label_hist:
+                    self.label_hist.append(text)
+            
             self.set_dirty()
             self.update_combo_box()
 
@@ -882,10 +918,13 @@ class MainWindow(QMainWindow, WindowMixin):
             shape.close()
             s.append(shape)
 
-            if line_color:
-                shape.line_color = QColor(*line_color)
-            else:
-                shape.line_color = generate_color_by_text(label)
+            # 使用固定的亮绿色边框
+            from libs.shape import DEFAULT_LINE_COLOR
+            shape.line_color = DEFAULT_LINE_COLOR
+            # if line_color:
+            #     shape.line_color = QColor(*line_color)
+            # else:
+            #     shape.line_color = generate_color_by_text(label)
 
             if fill_color:
                 shape.fill_color = QColor(*fill_color)
@@ -998,7 +1037,9 @@ class MainWindow(QMainWindow, WindowMixin):
         label = item.text()
         if label != shape.label:
             shape.label = item.text()
-            shape.line_color = generate_color_by_text(shape.label)
+            # 使用固定的亮绿色边框
+            from libs.shape import DEFAULT_LINE_COLOR
+            shape.line_color = DEFAULT_LINE_COLOR
             self.set_dirty()
         else:  # User probably changed item visibility
             self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
@@ -1030,18 +1071,48 @@ class MainWindow(QMainWindow, WindowMixin):
             self.canvas.save_history_state('create')
             
             self.prev_label_text = text
-            generate_color = generate_color_by_text(text)
-            shape = self.canvas.set_last_label(text, generate_color, generate_color)
-            self.add_label(shape)
+            
+            # 检查是否为多标签
+            if ',' in text:
+                # 多标签：为每个标签创建一个形状
+                labels = [label.strip() for label in text.split(',')]
+                current_shape_points = None
+                
+                for i, label in enumerate(labels):
+                    if label:  # 确保标签不为空
+                        if i == 0:
+                            # 第一个标签：使用当前绘制的形状
+                            from libs.shape import DEFAULT_LINE_COLOR
+                            shape = self.canvas.set_last_label(label, DEFAULT_LINE_COLOR, generate_color_by_text(label))
+                            current_shape_points = shape.points.copy()  # 保存形状坐标
+                            self.add_label(shape)
+                        else:
+                            # 后续标签：创建相同位置的新形状
+                            from libs.shape import Shape, DEFAULT_LINE_COLOR
+                            new_shape = Shape(label=label, line_color=DEFAULT_LINE_COLOR)
+                            new_shape.points = current_shape_points.copy()  # 使用相同坐标
+                            new_shape.fill_color = generate_color_by_text(label)
+                            new_shape.close()
+                            self.canvas.shapes.append(new_shape)
+                            self.add_label(new_shape)
+                        
+                        # 添加到历史记录
+                        if label not in self.label_hist:
+                            self.label_hist.append(label)
+            else:
+                # 单标签：使用固定的亮绿色边框
+                from libs.shape import DEFAULT_LINE_COLOR
+                shape = self.canvas.set_last_label(text, DEFAULT_LINE_COLOR, generate_color_by_text(text))
+                self.add_label(shape)
+                if text not in self.label_hist:
+                    self.label_hist.append(text)
+            
             if self.beginner():  # Switch to edit mode.
                 self.canvas.set_editing(True)
                 self.actions.create.setEnabled(True)
             else:
                 self.actions.editMode.setEnabled(True)
             self.set_dirty()
-
-            if text not in self.label_hist:
-                self.label_hist.append(text)
         else:
             # self.canvas.undoLastLine()
             self.canvas.reset_all_lines()
