@@ -306,6 +306,11 @@ class MainWindow(QMainWindow, WindowMixin):
                       'Ctrl+Z', 'undo', 'Undo last action',
                       enabled=False)
         undo.setIcon(new_icon('undo'))
+        
+        clear_all = action('Clear All Shapes', self.clear_all_shapes,
+                          'Shift+C', 'resetall', 'Clear all shapes in current image',
+                          enabled=False)
+        clear_all.setIcon(new_icon('resetall'))
 
         advanced_mode = action(get_str('advancedMode'), self.toggle_advanced_mode,
                                'Ctrl+Shift+A', 'expert', get_str('advancedModeDetail'),
@@ -413,17 +418,18 @@ class MainWindow(QMainWindow, WindowMixin):
                               zoomActions=zoom_actions,
                               lightBrighten=light_brighten, lightDarken=light_darken, lightOrg=light_org,
                               lightActions=light_actions,
+                              clearAll=clear_all, undo=undo,
                               fileMenuActions=(
                                   open, open_dir, save, save_as, close, reset_all, quit),
                               beginner=(), advanced=(),
-                              editMenu=(edit, copy, delete, undo,
+                              editMenu=(edit, copy, delete, undo, clear_all,
                                         None, color1, self.draw_squares_option),
                               beginnerContext=(create, edit, copy, delete),
                               advancedContext=(create_mode, edit_mode, edit, copy,
                                                delete, shape_line_color, shape_fill_color),
                               onLoadActive=(
                                   close, create, create_mode, edit_mode),
-                              onShapesPresent=(save_as, hide_all, show_all, undo))
+                              onShapesPresent=(save_as, hide_all, show_all, undo, clear_all))
 
         self.menus = Struct(
             file=self.menu(get_str('menu_file')),
@@ -1073,6 +1079,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.prev_label_text = text
             
             # 检查是否为多标签
+            created_shapes = []  # 记录创建的形状
             if ',' in text:
                 # 多标签：为每个标签创建一个形状
                 labels = [label.strip() for label in text.split(',')]
@@ -1086,6 +1093,7 @@ class MainWindow(QMainWindow, WindowMixin):
                             shape = self.canvas.set_last_label(label, DEFAULT_LINE_COLOR, generate_color_by_text(label))
                             current_shape_points = shape.points.copy()  # 保存形状坐标
                             self.add_label(shape)
+                            created_shapes.append(shape)
                         else:
                             # 后续标签：创建相同位置的新形状
                             from libs.shape import Shape, DEFAULT_LINE_COLOR
@@ -1095,6 +1103,7 @@ class MainWindow(QMainWindow, WindowMixin):
                             new_shape.close()
                             self.canvas.shapes.append(new_shape)
                             self.add_label(new_shape)
+                            created_shapes.append(new_shape)
                         
                         # 添加到历史记录
                         if label not in self.label_hist:
@@ -1104,8 +1113,15 @@ class MainWindow(QMainWindow, WindowMixin):
                 from libs.shape import DEFAULT_LINE_COLOR
                 shape = self.canvas.set_last_label(text, DEFAULT_LINE_COLOR, generate_color_by_text(text))
                 self.add_label(shape)
+                created_shapes.append(shape)
                 if text not in self.label_hist:
                     self.label_hist.append(text)
+            
+            # 自动选中新创建的形状
+            if created_shapes:
+                self.canvas.de_select_shape()  # 先清除之前的选择
+                for shape in created_shapes:
+                    self.canvas.select_shape(shape, multi_select=True)
             
             if self.beginner():  # Switch to edit mode.
                 self.canvas.set_editing(True)
@@ -1728,6 +1744,18 @@ class MainWindow(QMainWindow, WindowMixin):
             if self.no_shapes():
                 for action in self.actions.onShapesPresent:
                     action.setEnabled(False)
+    
+    def clear_all_shapes(self):
+        """清空当前图片的所有形状"""
+        if self.canvas.clear_all_shapes():
+            # 清空标签列表
+            self.label_list.clear()
+            self.items_to_shapes.clear()
+            self.shapes_to_items.clear()
+            self.set_dirty()
+            # 禁用相关操作
+            for action in self.actions.onShapesPresent:
+                action.setEnabled(False)
 
     def choose_shape_line_color(self):
         color = self.color_dialog.getColor(self.line_color, u'Choose Line Color',

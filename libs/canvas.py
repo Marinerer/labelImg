@@ -978,3 +978,20 @@ class Canvas(QWidget):
     def clear_history(self):
         """清空历史记录"""
         self.history = []
+    
+    def clear_all_shapes(self):
+        """清空当前图片的所有形状"""
+        if not self.shapes:
+            return False
+        
+        # 保存清空前的状态
+        self.save_history_state('clear_all')
+        
+        # 清空所有形状
+        self.shapes = []
+        self.de_select_shape()
+        self.un_highlight()
+        
+        # 更新显示
+        self.update()
+        return True
