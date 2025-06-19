@@ -874,7 +874,12 @@ class MainWindow(QMainWindow, WindowMixin):
         else:
             shape = self.canvas.selected_shape
             if shape:
-                self.shapes_to_items[shape].setSelected(True)
+                # 安全检查：确保shape在shapes_to_items字典中存在
+                if shape in self.shapes_to_items:
+                    self.shapes_to_items[shape].setSelected(True)
+                else:
+                    # 如果shape不在字典中，可能是时序问题，忽略这次选择
+                    print(f"Warning: Shape {shape} not found in shapes_to_items dictionary")
             else:
                 self.label_list.clearSelection()
         self.actions.delete.setEnabled(selected)
@@ -901,6 +906,10 @@ class MainWindow(QMainWindow, WindowMixin):
     def remove_label(self, shape):
         if shape is None:
             # print('rm empty label')
+            return
+        # 安全检查：确保shape在shapes_to_items字典中存在
+        if shape not in self.shapes_to_items:
+            print(f"Warning: Shape {shape} not found in shapes_to_items dictionary during removal")
             return
         item = self.shapes_to_items[shape]
         self.label_list.takeItem(self.label_list.row(item))
@@ -1119,9 +1128,14 @@ class MainWindow(QMainWindow, WindowMixin):
             
             # 自动选中新创建的形状
             if created_shapes:
-                self.canvas.de_select_shape()  # 先清除之前的选择
-                for shape in created_shapes:
-                    self.canvas.select_shape(shape, multi_select=True)
+                # 使用QTimer.singleShot延迟选择，确保所有UI更新完成
+                from PyQt5.QtCore import QTimer
+                def delayed_select():
+                    self.canvas.de_select_shape()  # 先清除之前的选择
+                    for shape in created_shapes:
+                        if shape in self.shapes_to_items:  # 确保shape已经在字典中
+                            self.canvas.select_shape(shape, multi_select=True)
+                QTimer.singleShot(0, delayed_select)
             
             if self.beginner():  # Switch to edit mode.
                 self.canvas.set_editing(True)
