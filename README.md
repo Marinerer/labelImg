@@ -56,6 +56,9 @@ LabelImg 是一个图形图像注释工具。
 | `Ctrl + Shift + d` | 删除当前图像及标注数据文件     |
 | `Shift + c`         | 清空当前图片所有标注 |
 | `Shift + d`        | 切换下一张并自动载入上一张数据 |
+| `Ctrl + v`        | 粘贴上一张数据 |
+| `Ctrl + Shift + c`        | 复制选中的数据 |
+| `Ctrl + Shift + v`        | 粘贴复制的数据 |
 | `Ctrl + z`         | 撤销操作，仅对当前图片操作有效 |
 | `Ctrl + click`     | 点选                           |
 | `Shift + move`     | 框选                           |
