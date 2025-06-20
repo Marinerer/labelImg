@@ -300,6 +300,14 @@ class MainWindow(QMainWindow, WindowMixin):
                       'Ctrl+D', 'copy', get_str('dupBoxDetail'),
                       enabled=False)
         
+        # Global copy/paste actions for cross-image functionality
+        global_copy = action('Copy to Clipboard', self.global_copy_selected_shape,
+                            'Ctrl+Shift+C', 'copy', 'Copy selected shapes to global clipboard',
+                            enabled=False)
+        global_paste = action('Paste from Clipboard', self.global_paste_shapes,
+                             'Ctrl+Shift+V', 'copy', 'Paste shapes from global clipboard',
+                             enabled=False)
+        
         undo = action('Undo', self.undo_action,
                       'Ctrl+Z', 'undo', 'Undo last action',
                       enabled=False)
@@ -409,6 +417,7 @@ class MainWindow(QMainWindow, WindowMixin):
         # Store actions for further handling.
         self.actions = Struct(save=save, save_format=save_format, saveAs=save_as, open=open, close=close, resetAll=reset_all, deleteImg=delete_image,
                               lineColor=color1, create=create, delete=delete, edit=edit, copy=copy,
+                              globalCopy=global_copy, globalPaste=global_paste,
                               createMode=create_mode, editMode=edit_mode, advancedMode=advanced_mode,
                               shapeLineColor=shape_line_color, shapeFillColor=shape_fill_color,
                               zoom=zoom, zoomIn=zoom_in, zoomOut=zoom_out, zoomOrg=zoom_org,
@@ -421,7 +430,7 @@ class MainWindow(QMainWindow, WindowMixin):
                                   open, open_dir, save, save_as, close, reset_all, quit),
                               beginner=(), advanced=(),
                               editMenu=(edit, copy, delete, undo, clear_all,
-                                        None, color1, self.draw_squares_option),
+                                        None, global_copy, global_paste, None, color1, self.draw_squares_option),
                               beginnerContext=(create, edit, copy, delete),
                               advancedContext=(create_mode, edit_mode, edit, copy,
                                                delete, shape_line_color, shape_fill_color),
@@ -880,6 +889,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.label_list.clearSelection()
         self.actions.delete.setEnabled(selected)
         self.actions.copy.setEnabled(selected)
+        self.actions.globalCopy.setEnabled(selected)
         self.actions.edit.setEnabled(selected)
         self.actions.shapeLineColor.setEnabled(selected)
         self.actions.shapeFillColor.setEnabled(selected)
@@ -1019,6 +1029,27 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.add_label(shape)
         # fix copy and delete
         self.shape_selection_changed(True)
+    
+    def global_copy_selected_shape(self):
+        """Copy selected shapes to global clipboard for cross-image paste"""
+        if self.canvas.copy_selected_to_clipboard():
+            self.actions.globalPaste.setEnabled(True)
+            # Show status message
+            self.status(f'Copied {len(self.canvas.selected_shapes)} shape(s) to clipboard')
+    
+    def global_paste_shapes(self):
+        """Paste shapes from global clipboard to current image"""
+        pasted_shapes = self.canvas.paste_from_clipboard()
+        if pasted_shapes:
+            self.set_dirty()
+            self.shape_selection_changed(True)
+            # Show status message
+            self.status(f'Pasted {len(pasted_shapes)} shape(s) from clipboard')
+            # Add labels to the list
+            for shape in pasted_shapes:
+                self.add_label(shape)
+        else:
+            self.status('No shapes in clipboard to paste')
     
     def undo_action(self):
         """撤销上一个操作"""
