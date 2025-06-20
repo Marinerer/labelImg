@@ -18,6 +18,9 @@ CURSOR_DRAW = Qt.CrossCursor
 CURSOR_MOVE = Qt.ClosedHandCursor
 CURSOR_GRAB = Qt.OpenHandCursor
 
+# Global clipboard for cross-image copy/paste
+GLOBAL_CLIPBOARD = []
+
 # class Canvas(QGLWidget):
 
 
@@ -618,6 +621,72 @@ class Canvas(QWidget):
             
         self.update()
         return copied_shapes
+    
+    def copy_selected_to_clipboard(self):
+        """Copy selected shapes to global clipboard for cross-image paste"""
+        global GLOBAL_CLIPBOARD
+        if not self.selected_shapes:
+            return False
+        
+        # Clear previous clipboard content
+        GLOBAL_CLIPBOARD = []
+        
+        # Copy selected shapes to clipboard
+        for shape in self.selected_shapes:
+            shape_data = {
+                'label': shape.label,
+                'points': [QPointF(p.x(), p.y()) for p in shape.points],
+                'line_color': shape.line_color,
+                'fill_color': shape.fill_color,
+                'difficult': shape.difficult,
+                'paint_label': shape.paint_label
+            }
+            GLOBAL_CLIPBOARD.append(shape_data)
+        
+        return True
+    
+    def paste_from_clipboard(self):
+        """Paste shapes from global clipboard to current image"""
+        global GLOBAL_CLIPBOARD
+        if not GLOBAL_CLIPBOARD:
+            return []
+        
+        # Save state before pasting
+        self.save_history_state('paste')
+        
+        pasted_shapes = []
+        offset = QPointF(0, 0)  # Default offset for pasted shapes
+        
+        # Clear current selection
+        self.de_select_shape()
+        
+        for shape_data in GLOBAL_CLIPBOARD:
+            # Create new shape from clipboard data
+            new_shape = Shape(label=shape_data['label'])
+            
+            # Copy points with offset
+            for point in shape_data['points']:
+                new_shape.points.append(QPointF(point.x() + offset.x(), point.y() + offset.y()))
+            
+            # Copy other properties
+            new_shape.line_color = shape_data['line_color']
+            new_shape.fill_color = shape_data['fill_color']
+            new_shape.difficult = shape_data['difficult']
+            new_shape.paint_label = shape_data['paint_label']
+            new_shape.close()
+            
+            # Add to canvas
+            self.shapes.append(new_shape)
+            new_shape.selected = True
+            pasted_shapes.append(new_shape)
+        
+        # Select all pasted shapes
+        self.selected_shapes = pasted_shapes
+        if pasted_shapes:
+            self._selected_shape = pasted_shapes[0]
+        
+        self.update()
+        return pasted_shapes
 
     def bounded_shift_shape(self, shape):
         # No offset for copied shapes - keep them in the same position
