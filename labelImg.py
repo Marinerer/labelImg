@@ -35,8 +35,6 @@ except ImportError:
     from PyQt4.QtCore import *
 
 # 添加当前目录到 Python 路径以支持打包环境
-import sys
-import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
@@ -805,7 +803,6 @@ class MainWindow(QMainWindow, WindowMixin):
                 # 为每个标签创建新形状
                 for i, label in enumerate(labels):
                     if label:  # 确保标签不为空
-                        from libs.shape import Shape, DEFAULT_LINE_COLOR
                         new_shape = Shape(label=label, line_color=DEFAULT_LINE_COLOR)
                         new_shape.points = original_points.copy()  # 使用相同坐标
                         new_shape.fill_color = generate_color_by_text(label)
@@ -820,7 +817,6 @@ class MainWindow(QMainWindow, WindowMixin):
                 # 单标签：更新现有形状
                 original_shape.label = text
                 # 使用固定的亮绿色边框
-                from libs.shape import DEFAULT_LINE_COLOR
                 original_shape.line_color = DEFAULT_LINE_COLOR
                 original_shape.fill_color = generate_color_by_text(text)
                 item.setText(text)
@@ -919,7 +915,22 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def load_labels(self, shapes):
         s = []
+        # 用于检测重复的集合，存储(label, points_tuple)的组合
+        seen_shapes = set()
+        
         for label, points, line_color, fill_color, difficult in shapes:
+            # 将points转换为可哈希的元组用于重复检测
+            points_tuple = tuple(tuple(point) for point in points)
+            shape_key = (label, points_tuple)
+
+            # 检查是否重复
+            if shape_key in seen_shapes:
+                print(f"Duplicate data was detected, Skipped：label='{label}', point={points}")
+                continue
+            
+            # 添加到已见集合
+            seen_shapes.add(shape_key)
+            
             shape = Shape(label=label)
             for x, y in points:
 
@@ -934,7 +945,6 @@ class MainWindow(QMainWindow, WindowMixin):
             s.append(shape)
 
             # 使用固定的亮绿色边框
-            from libs.shape import DEFAULT_LINE_COLOR
             shape.line_color = DEFAULT_LINE_COLOR
             # if line_color:
             #     shape.line_color = QColor(*line_color)
@@ -1053,7 +1063,6 @@ class MainWindow(QMainWindow, WindowMixin):
         if label != shape.label:
             shape.label = item.text()
             # 使用固定的亮绿色边框
-            from libs.shape import DEFAULT_LINE_COLOR
             shape.line_color = DEFAULT_LINE_COLOR
             self.set_dirty()
         else:  # User probably changed item visibility
@@ -1098,14 +1107,12 @@ class MainWindow(QMainWindow, WindowMixin):
                     if label:  # 确保标签不为空
                         if i == 0:
                             # 第一个标签：使用当前绘制的形状
-                            from libs.shape import DEFAULT_LINE_COLOR
                             shape = self.canvas.set_last_label(label, DEFAULT_LINE_COLOR, generate_color_by_text(label))
                             current_shape_points = shape.points.copy()  # 保存形状坐标
                             self.add_label(shape)
                             created_shapes.append(shape)
                         else:
                             # 后续标签：创建相同位置的新形状
-                            from libs.shape import Shape, DEFAULT_LINE_COLOR
                             new_shape = Shape(label=label, line_color=DEFAULT_LINE_COLOR)
                             new_shape.points = current_shape_points.copy()  # 使用相同坐标
                             new_shape.fill_color = generate_color_by_text(label)
@@ -1119,7 +1126,6 @@ class MainWindow(QMainWindow, WindowMixin):
                             self.label_hist.append(label)
             else:
                 # 单标签：使用固定的亮绿色边框
-                from libs.shape import DEFAULT_LINE_COLOR
                 shape = self.canvas.set_last_label(text, DEFAULT_LINE_COLOR, generate_color_by_text(text))
                 self.add_label(shape)
                 created_shapes.append(shape)
