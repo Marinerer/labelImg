@@ -251,8 +251,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
         open_prev_image = action(get_str('prevImg'), self.open_prev_image,
                                  'a', 'prev', get_str('prevImgDetail'))
-        open_next_image_with_copy = action(get_str('nextImgWithCopy'), self.open_next_image_with_copy,
-                                 'Shift+d', 'next', get_str('nextImgWithCopyDetail'))
+        # open_next_image_with_copy = action(get_str('nextImgWithCopy'), self.open_next_image_with_copy,
+        #                          'Shift+d', 'next', get_str('nextImgWithCopyDetail'))
         verify = action(get_str('verifyImg'), self.verify_image,
                         'space', 'verify', get_str('verifyImgDetail'))
 
@@ -486,12 +486,12 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.tools = self.toolbar('Tools')
         self.actions.beginner = (
-            open, open_dir, change_save_dir, open_next_image, open_prev_image, open_next_image_with_copy, verify, save, save_format, None, create, copy, delete, undo, None,
+            open, open_dir, change_save_dir, open_next_image, open_prev_image, verify, save, save_format, None, create, copy, delete, undo, None,
             zoom_in, zoom, zoom_out, fit_window, fit_width, None,
             light_brighten, light, light_darken, light_org)
 
         self.actions.advanced = (
-            open, open_dir, change_save_dir, open_next_image, open_prev_image, open_next_image_with_copy, save, save_format, None,
+            open, open_dir, change_save_dir, open_next_image, open_prev_image, save, save_format, None,
             create_mode, edit_mode, undo, None,
             hide_all, show_all)
 
@@ -1369,10 +1369,17 @@ class MainWindow(QMainWindow, WindowMixin):
         """
         return '[{} / {}]'.format(self.cur_img_idx + 1, self.img_count)
 
+    """
+    根据注解文件显示标注框
+
+    参数:
+    - file_path: 注解文件的路径或图片文件路径。如果为None，则不执行任何操作。
+    """
     def show_bounding_box_from_annotation_file(self, file_path):
         if file_path is None:
             return
         if self.default_save_dir is not None:
+            # 从文件路径中提取基础文件名，用于构建注解文件路径
             basename = os.path.basename(os.path.splitext(file_path)[0])
             xml_path = os.path.join(self.default_save_dir, basename + XML_EXT)
             txt_path = os.path.join(self.default_save_dir, basename + TXT_EXT)
@@ -1381,6 +1388,7 @@ class MainWindow(QMainWindow, WindowMixin):
             """Annotation file priority:
             PascalXML > YOLO
             """
+            # 根据文件存在性和优先级加载对应的注解文件
             if os.path.isfile(xml_path):
                 self.load_pascal_xml_by_filename(xml_path)
             elif os.path.isfile(txt_path):
@@ -1389,10 +1397,12 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.load_create_ml_json_by_filename(json_path, file_path)
 
         else:
+            # 如果没有默认保存目录，直接基于file_path构建注解文件路径
             xml_path = os.path.splitext(file_path)[0] + XML_EXT
             txt_path = os.path.splitext(file_path)[0] + TXT_EXT
             json_path = os.path.splitext(file_path)[0] + JSON_EXT
 
+            # 同样根据文件存在性和优先级加载对应的注解文件
             if os.path.isfile(xml_path):
                 self.load_pascal_xml_by_filename(xml_path)
             elif os.path.isfile(txt_path):
@@ -1887,9 +1897,13 @@ class MainWindow(QMainWindow, WindowMixin):
         self.load_labels(shapes)
         self.canvas.verified = create_ml_parse_reader.verified
 
+    """复制前一个图像的标注信息，并保存到当前图像"""
     def copy_previous_bounding_boxes(self):
         current_index = self.m_img_list.index(self.file_path)
         if current_index - 1 >= 0:
+            # 清空当前图像的标注信息
+            self.clear_all_shapes()
+            # 获取前一个图像的文件路径
             prev_file_path = self.m_img_list[current_index - 1]
             self.show_bounding_box_from_annotation_file(prev_file_path)
             self.save_file()
@@ -1900,6 +1914,10 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def toggle_draw_square(self):
         self.canvas.set_drawing_shape_to_square(self.draw_squares_option.isChecked())
+        
+    """
+    切换下一张图像, 并自动载入当前图像的标注信息
+    """
     def open_next_image_with_copy(self, _value=False):
         # 保存当前图片的标注（如果需要）
         if self.auto_saving.isChecked():
