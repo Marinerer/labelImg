@@ -1983,6 +1983,22 @@ def get_main_app(argv=None):
     Standard boilerplate Qt application code.
     Do everything but app.exec_() -- so that we can test the application in one thread
     """
+    # 检查软件是否过期
+    from datetime import datetime
+    current_date = datetime.now()
+    expiry_date = datetime(2025, 12, 30)
+    
+    if current_date > expiry_date:
+        # 创建临时应用程序以显示消息框
+        temp_app = QApplication(argv if argv else [])
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.setWindowTitle("温馨提示")
+        msg_box.setText("抱歉，软件过期无法使用！请联系管理员。")
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        msg_box.exec_()
+        sys.exit(0)
+    
     if not argv:
         argv = []
     app = QApplication(argv)
