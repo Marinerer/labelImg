@@ -246,11 +246,11 @@ class MainWindow(QMainWindow, WindowMixin):
                                  'Ctrl+Shift+O', 'open', get_str('openAnnotationDetail'))
         copy_prev_bounding = action(get_str('copyPrevBounding'), self.copy_previous_bounding_boxes, 'Ctrl+v', 'copy', get_str('copyPrevBounding'))
 
-        open_next_image = action(get_str('nextImg'), self.open_next_image,
-                                 'd', 'next', get_str('nextImgDetail'))
+        open_next_image = action(get_str('nextImg'), self.open_next_image, 'd', 'next', get_str('nextImgDetail'))
+        open_next_image2 = action(get_str('nextImg'), self.open_next_image, ']', 'next', get_str('nextImgDetail'))
 
-        open_prev_image = action(get_str('prevImg'), self.open_prev_image,
-                                 'a', 'prev', get_str('prevImgDetail'))
+        open_prev_image = action(get_str('prevImg'), self.open_prev_image, 'a', 'prev', get_str('prevImgDetail'))
+        open_prev_image2 = action(get_str('prevImg'), self.open_prev_image, '[', 'prev', get_str('prevImgDetail'))
         # open_next_image_with_copy = action(get_str('nextImgWithCopy'), self.open_next_image_with_copy,
         #                          'Shift+d', 'next', get_str('nextImgWithCopyDetail'))
         verify = action(get_str('verifyImg'), self.verify_image,
@@ -486,12 +486,12 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.tools = self.toolbar('Tools')
         self.actions.beginner = (
-            open, open_dir, change_save_dir, open_next_image, open_prev_image, verify, save, save_format, None, create, copy, delete, undo, None,
+            open, open_dir, change_save_dir, open_next_image, open_next_image2, open_prev_image, open_prev_image2, verify, save, save_format, None, create, copy, delete, undo, None,
             zoom_in, zoom, zoom_out, fit_window, fit_width, None,
             light_brighten, light, light_darken, light_org)
 
         self.actions.advanced = (
-            open, open_dir, change_save_dir, open_next_image, open_prev_image, save, save_format, None,
+            open, open_dir, change_save_dir, open_next_image, open_next_image2, open_prev_image, open_prev_image2, save, save_format, None,
             create_mode, edit_mode, undo, None,
             hide_all, show_all)
 
