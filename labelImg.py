@@ -100,8 +100,12 @@ class MainWindow(QMainWindow, WindowMixin):
         self.os_name = platform.system()
 
         # Load string bundle for i18n
-        self.string_bundle = StringBundle.get_bundle()
+        saved_language = settings.get('language', 'en') # 默认设置为 'en', 中文=>'zh-CN'
+        self.string_bundle = StringBundle.get_bundle(saved_language)
         get_str = lambda str_id: self.string_bundle.get_string(str_id)
+        
+        # Registration and trial management
+        self.check_registration_and_trial()
 
         # Save as Pascal voc xml
         self.default_save_dir = default_save_dir
@@ -230,34 +234,27 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Actions
         action = partial(new_action, self)
-        quit = action(get_str('quit'), self.close,
-                      'Ctrl+Q', 'quit', get_str('quitApp'))
+        quit = action(get_str('quit'), self.close, 'Ctrl+Q', 'quit', get_str('quitApp'))
 
-        open = action(get_str('openFile'), self.open_file,
-                      'Ctrl+O', 'open', get_str('openFileDetail'))
+        open = action(get_str('openFile'), self.open_file, 'Ctrl+O', 'open', get_str('openFileDetail'))
 
-        open_dir = action(get_str('openDir'), self.open_dir_dialog,
-                          'Ctrl+u', 'open', get_str('openDir'))
+        open_dir = action(get_str('openDir'), self.open_dir_dialog, 'Ctrl+u', 'open', get_str('openDir'))
 
-        change_save_dir = action(get_str('changeSaveDir'), self.change_save_dir_dialog,
-                                 'Ctrl+r', 'open', get_str('changeSavedAnnotationDir'))
+        change_save_dir = action(get_str('changeSaveDir'), self.change_save_dir_dialog, 'Ctrl+r', 'open', get_str('changeSavedAnnotationDir'))
 
-        open_annotation = action(get_str('openAnnotation'), self.open_annotation_dialog,
-                                 'Ctrl+Shift+O', 'open', get_str('openAnnotationDetail'))
+        open_annotation = action(get_str('openAnnotation'), self.open_annotation_dialog, 'Ctrl+Shift+O', 'open', get_str('openAnnotationDetail'))
         copy_prev_bounding = action(get_str('copyPrevBounding'), self.copy_previous_bounding_boxes, 'Ctrl+v', 'copy', get_str('copyPrevBounding'))
 
-        open_next_image = action(get_str('nextImg'), self.open_next_image,
-                                 'd', 'next', get_str('nextImgDetail'))
+        open_next_image = action(get_str('nextImg'), self.open_next_image, 'd', 'next', get_str('nextImgDetail'))
+        open_next_image2 = action(get_str('nextImg'), self.open_next_image, ']', 'next', get_str('nextImgDetail'))
 
-        open_prev_image = action(get_str('prevImg'), self.open_prev_image,
-                                 'a', 'prev', get_str('prevImgDetail'))
+        open_prev_image = action(get_str('prevImg'), self.open_prev_image, 'a', 'prev', get_str('prevImgDetail'))
+        open_prev_image2 = action(get_str('prevImg'), self.open_prev_image, '[', 'prev', get_str('prevImgDetail'))
         # open_next_image_with_copy = action(get_str('nextImgWithCopy'), self.open_next_image_with_copy,
         #                          'Shift+d', 'next', get_str('nextImgWithCopyDetail'))
-        verify = action(get_str('verifyImg'), self.verify_image,
-                        'space', 'verify', get_str('verifyImgDetail'))
+        verify = action(get_str('verifyImg'), self.verify_image, 'space', 'verify', get_str('verifyImgDetail'))
 
-        save = action(get_str('save'), self.save_file,
-                      'Ctrl+S', 'save', get_str('saveDetail'), enabled=False)
+        save = action(get_str('save'), self.save_file, 'Ctrl+S', 'save', get_str('saveDetail'), enabled=False)
 
         def get_format_meta(format):
             """
@@ -284,21 +281,14 @@ class MainWindow(QMainWindow, WindowMixin):
 
         reset_all = action(get_str('resetAll'), self.reset_all, None, 'resetall', get_str('resetAllDetail'))
 
-        color1 = action(get_str('boxLineColor'), self.choose_color1,
-                        'Ctrl+L', 'color_line', get_str('boxLineColorDetail'))
+        color1 = action(get_str('boxLineColor'), self.choose_color1, 'Ctrl+L', 'color_line', get_str('boxLineColorDetail'))
 
-        create_mode = action(get_str('crtBox'), self.set_create_mode,
-                             'w', 'new', get_str('crtBoxDetail'), enabled=False)
-        edit_mode = action(get_str('editBox'), self.set_edit_mode,
-                           'Ctrl+J', 'edit', get_str('editBoxDetail'), enabled=False)
+        create_mode = action(get_str('crtBox'), self.set_create_mode, 'w', 'new', get_str('crtBoxDetail'), enabled=False)
+        edit_mode = action(get_str('editBox'), self.set_edit_mode, 'Ctrl+J', 'edit', get_str('editBoxDetail'), enabled=False)
 
-        create = action(get_str('crtBox'), self.create_shape,
-                        'w', 'new', get_str('crtBoxDetail'), enabled=False)
-        delete = action(get_str('delBox'), self.delete_selected_shape,
-                        'Delete', 'delete', get_str('delBoxDetail'), enabled=False)
-        copy = action(get_str('dupBox'), self.copy_selected_shape,
-                      'Ctrl+D', 'copy', get_str('dupBoxDetail'),
-                      enabled=False)
+        create = action(get_str('crtBox'), self.create_shape, 'w', 'new', get_str('crtBoxDetail'), enabled=False)
+        delete = action(get_str('delBox'), self.delete_selected_shape, 'Delete', 'delete', get_str('delBoxDetail'), enabled=False)
+        copy = action(get_str('dupBox'), self.copy_selected_shape, 'Ctrl+D', 'copy', get_str('dupBoxDetail'), enabled=False)
         
         # Global copy/paste actions for cross-image functionality
         global_copy = action('Copy to Clipboard', self.global_copy_selected_shape,
@@ -308,9 +298,7 @@ class MainWindow(QMainWindow, WindowMixin):
                              'Ctrl+Shift+V', 'copy', 'Paste shapes from global clipboard',
                              enabled=False)
         
-        undo = action('Undo', self.undo_action,
-                      'Ctrl+Z', 'undo', 'Undo last action',
-                      enabled=False)
+        undo = action('Undo', self.undo_action, 'Ctrl+Z', 'undo', 'Undo last action', enabled=False)
         undo.setIcon(new_icon('undo'))
         
         clear_all = action('Clear All Shapes', self.clear_all_shapes,
@@ -332,6 +320,8 @@ class MainWindow(QMainWindow, WindowMixin):
         help_default = action(get_str('tutorialDefault'), self.show_default_tutorial_dialog, None, 'help', get_str('tutorialDetail'))
         show_info = action(get_str('info'), self.show_info_dialog, None, 'help', get_str('info'))
         show_shortcut = action(get_str('shortcut'), self.show_shortcuts_dialog, None, 'help', get_str('shortcut'))
+        language_switch = action(get_str('languageSwitch'), self.show_language_dialog, None, 'help', get_str('languageSwitchDetail'))
+        registration_code = action(get_str('registrationCode'), self.show_registration_dialog, None, 'help', get_str('registrationCodeDetail'))
 
         zoom = QWidgetAction(self)
         zoom.setDefaultWidget(self.zoom_widget)
@@ -465,7 +455,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         add_actions(self.menus.file,
                     (open, open_dir, change_save_dir, open_annotation, copy_prev_bounding, self.menus.recentFiles, save, save_format, save_as, close, reset_all, delete_image, quit))
-        add_actions(self.menus.help, (help_default, show_info, show_shortcut))
+        add_actions(self.menus.help, (help_default, show_info, show_shortcut, None, language_switch, registration_code))
         add_actions(self.menus.view, (
             self.auto_saving,
             self.single_class_mode,
@@ -486,12 +476,12 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.tools = self.toolbar('Tools')
         self.actions.beginner = (
-            open, open_dir, change_save_dir, open_next_image, open_prev_image, verify, save, save_format, None, create, copy, delete, undo, None,
+            open, open_dir, change_save_dir, open_next_image, open_next_image2, open_prev_image, open_prev_image2, verify, save, save_format, None, create, copy, delete, undo, None,
             zoom_in, zoom, zoom_out, fit_window, fit_width, None,
             light_brighten, light, light_darken, light_org)
 
         self.actions.advanced = (
-            open, open_dir, change_save_dir, open_next_image, open_prev_image, save, save_format, None,
+            open, open_dir, change_save_dir, open_next_image, open_next_image2, open_prev_image, open_prev_image2, save, save_format, None,
             create_mode, edit_mode, undo, None,
             hide_all, show_all)
 
@@ -736,7 +726,155 @@ class MainWindow(QMainWindow, WindowMixin):
         QMessageBox.information(self, u'Information', msg)
 
     def show_shortcuts_dialog(self):
-        self.show_tutorial_dialog(browser='default', link='https://github.com/tzutalin/labelImg#Hotkeys')
+        #原仓库 https://github.com/tzutalin/labelImg#Hotkeys
+        self.show_tutorial_dialog(browser='default', link='https://github.com/Marinerer/labelImg#Hotkeys')
+    
+    def check_registration_and_trial(self):
+        """检查注册码和试用期"""
+        import datetime
+        
+        # 获取注册码
+        registration_code = self.settings.get('registration_code', '')
+        
+        # 检查注册码
+        if registration_code == 'mengqing723@gmail.com':
+            # 永久注册码
+            return True
+        elif registration_code == 'mengqing723@qq.com':
+            # 一年期注册码，检查是否过期
+            registration_date = self.settings.get('registration_date', '')
+            if registration_date:
+                try:
+                    reg_date = datetime.datetime.strptime(registration_date, '%Y-%m-%d')
+                    if datetime.datetime.now() - reg_date < datetime.timedelta(days=365):
+                        return True
+                except:
+                    pass
+        
+        # 检查试用期
+        first_run_date = self.settings.get('first_run_date', '')
+        if not first_run_date:
+            # 首次运行，记录日期
+            first_run_date = datetime.datetime.now().strftime('%Y-%m-%d')
+            self.settings['first_run_date'] = first_run_date
+            self.settings.save()
+        
+        try:
+            first_date = datetime.datetime.strptime(first_run_date, '%Y-%m-%d')
+            days_passed = (datetime.datetime.now() - first_date).days
+            
+            if days_passed >= 30:
+                # 试用期已过期
+                get_str = lambda str_id: self.string_bundle.get_string(str_id)
+                QMessageBox.critical(self, get_str('trialMode'), get_str('trialExpired'))
+                self.close()
+                sys.exit()
+            else:
+                # 显示试用期剩余天数
+                remaining_days = 30 - days_passed
+                get_str = lambda str_id: self.string_bundle.get_string(str_id)
+                # self.setWindowTitle(f"{__appname__} - {get_str('trialMode')} ({get_str('trialRemaining').format(remaining_days)})")
+                self.setWindowTitle(f"{__appname__} - ({get_str('trialRemaining').format(remaining_days)})")
+        except:
+            pass
+    
+    def show_language_dialog(self):
+        """显示语言切换对话框"""
+        get_str = lambda str_id: self.string_bundle.get_string(str_id)
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle(get_str('languageSwitch'))
+        dialog.setFixedSize(300, 150)
+        
+        layout = QVBoxLayout()
+        
+        # 语言选择
+        language_group = QGroupBox(get_str('languageSwitch'))
+        language_layout = QVBoxLayout()
+        
+        self.language_radio_en = QRadioButton('English')
+        self.language_radio_zh = QRadioButton('中文')
+        self.language_radio_ja = QRadioButton('日本語')
+        
+        # 获取当前语言设置
+        current_language = self.settings.get('language', 'en')
+        if current_language == 'zh-CN':
+            self.language_radio_zh.setChecked(True)
+        elif current_language == 'ja-JP':
+            self.language_radio_ja.setChecked(True)
+        else:
+            self.language_radio_en.setChecked(True)
+        
+        language_layout.addWidget(self.language_radio_en)
+        language_layout.addWidget(self.language_radio_zh)
+        language_layout.addWidget(self.language_radio_ja)
+        language_group.setLayout(language_layout)
+        
+        layout.addWidget(language_group)
+        
+        # 按钮
+        button_layout = QHBoxLayout()
+        ok_button = QPushButton('OK')
+        cancel_button = QPushButton('Cancel')
+        
+        ok_button.clicked.connect(lambda: self.apply_language_change(dialog))
+        cancel_button.clicked.connect(dialog.reject)
+        
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
+        layout.addLayout(button_layout)
+        
+        dialog.setLayout(layout)
+        dialog.exec_()
+    
+    def apply_language_change(self, dialog):
+        """应用语言更改"""
+        if self.language_radio_zh.isChecked():
+            new_language = 'zh-CN'
+        elif self.language_radio_ja.isChecked():
+            new_language = 'ja-JP'
+        else:
+            new_language = 'en'
+        
+        # 保存语言设置
+        self.settings['language'] = new_language
+        self.settings.save()
+        
+        dialog.accept()
+        
+        # 提示重启应用
+        QMessageBox.information(self, 'Language Switch', 'Please restart the application for the language change to take effect.')
+    
+    def show_registration_dialog(self):
+        """显示注册码输入对话框"""
+        get_str = lambda str_id: self.string_bundle.get_string(str_id)
+        
+        text, ok = QInputDialog.getText(self, get_str('enterRegistrationCode'), 
+                                       get_str('registrationCodeInput'), 
+                                       QLineEdit.Normal, '')
+        
+        if ok and text:
+            if self.validate_registration_code(text):
+                # 注册成功
+                self.settings['registration_code'] = text
+                if text == 'mengqing723@qq.com':
+                    # 一年期注册码，记录注册日期
+                    import datetime
+                    self.settings['registration_date'] = datetime.datetime.now().strftime('%Y-%m-%d')
+                self.settings.save()
+                
+                QMessageBox.information(self, get_str('registrationCode'), get_str('registrationSuccess'))
+                
+                # 更新窗口标题，移除试用模式提示
+                self.setWindowTitle(__appname__)
+            else:
+                # 注册失败
+                QMessageBox.warning(self, get_str('registrationCode'), get_str('registrationFailed'))
+    
+    def validate_registration_code(self, code):
+        """验证注册码"""
+        valid_codes = ['mengqing723@qq.com', 'mengqing723@gmail.com']
+        return code in valid_codes
 
     def create_shape(self):
         assert self.beginner()
