@@ -1,6 +1,11 @@
 import os
 import sys
+from os.path import dirname, abspath
 import unittest
+
+# 添加当前目录到搜索路径
+sys.path.append(dirname(dirname(abspath(__file__))))
+
 from libs.utils import Struct, new_action, new_icon, add_actions, format_shortcut, generate_color_by_text, natural_sort
 
 class TestUtils(unittest.TestCase):
