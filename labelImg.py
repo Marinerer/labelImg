@@ -764,11 +764,20 @@ class MainWindow(QMainWindow, WindowMixin):
             days_passed = (datetime.datetime.now() - first_date).days
             
             if days_passed >= 30:
-                # 试用期已过期
+                # 试用期已过期，弹出确认对话框
                 get_str = lambda str_id: self.string_bundle.get_string(str_id)
-                QMessageBox.critical(self, get_str('trialMode'), get_str('trialExpired'))
-                self.close()
-                sys.exit()
+                reply = QMessageBox.question(self, get_str('trialMode'), 
+                                            get_str('trialExpired').replace('\\n', '\n'),
+                                            QMessageBox.Yes | QMessageBox.No,
+                                            QMessageBox.Yes)
+                
+                if reply == QMessageBox.Yes:
+                    # 用户选择输入授权码
+                    self.show_registration_dialog_on_expired()
+                else:
+                    # 用户选择取消，退出软件
+                    self.close()
+                    sys.exit()
             else:
                 # 显示试用期剩余天数
                 remaining_days = 30 - days_passed
@@ -870,6 +879,45 @@ class MainWindow(QMainWindow, WindowMixin):
             else:
                 # 注册失败
                 QMessageBox.warning(self, get_str('registrationCode'), get_str('registrationFailed'))
+    
+    def show_registration_dialog_on_expired(self):
+        """试用期过期时显示授权码输入对话框"""
+        get_str = lambda str_id: self.string_bundle.get_string(str_id)
+        
+        while True:
+            text, ok = QInputDialog.getText(self, get_str('enterRegistrationCode'), 
+                                           get_str('registrationCodeInput'), 
+                                           QLineEdit.Normal, '')
+            
+            if ok and text:
+                if self.validate_registration_code(text):
+                    # 注册成功
+                    self.settings['registration_code'] = text
+                    if text == 'mengqing723@qq.com':
+                        # 一年期注册码，记录注册日期
+                        import datetime
+                        self.settings['registration_date'] = datetime.datetime.now().strftime('%Y-%m-%d')
+                    self.settings.save()
+                    
+                    QMessageBox.information(self, get_str('registrationCode'), get_str('registrationSuccess'))
+                    
+                    # 更新窗口标题，移除试用模式提示
+                    self.setWindowTitle(__appname__)
+                    break
+                else:
+                    # 注册失败，询问是否重新输入
+                    reply = QMessageBox.question(self, get_str('registrationCode'), 
+                                                get_str('registrationFailedConfirm').replace('\\n', '\n'),
+                                                QMessageBox.Yes | QMessageBox.No,
+                                                QMessageBox.Yes)
+                    if reply == QMessageBox.No:
+                        # 用户选择不重新输入，退出软件
+                        self.close()
+                        sys.exit()
+            else:
+                # 用户取消输入，退出软件
+                self.close()
+                sys.exit()
     
     def validate_registration_code(self, code):
         """验证注册码"""
