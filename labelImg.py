@@ -1110,9 +1110,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self.update_combo_box()
 
     def load_labels(self, shapes):
-        s = []
-        # 用于检测重复的集合，存储(label, points_tuple)的组合
-        seen_shapes = set()
+        flag_repeated = False #用于标记是否有重复数据
+        s = [] #用于存储转换后的数据
+        seen_shapes = set() #用于检测重复的集合，存储(label, points_tuple)的组合
         
         for label, points, line_color, fill_color, difficult in shapes:
             # 将points转换为可哈希的元组用于重复检测
@@ -1121,6 +1121,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
             # 检查是否重复
             if shape_key in seen_shapes:
+                flag_repeated = True
                 print(f"Duplicate data was detected, Skipped：label='{label}', point={points}")
                 continue
             
@@ -1153,8 +1154,15 @@ class MainWindow(QMainWindow, WindowMixin):
                 shape.fill_color = generate_color_by_text(label)
 
             self.add_label(shape)
+        
+        # 更新标签和画布
         self.update_combo_box()
+        # 替换原始 shapes 为去重后的 shapes
         self.canvas.load_shapes(s)
+
+        # 如果有重复数据，则标记为修改
+        if flag_repeated is True:
+            self.set_dirty()
 
     def update_combo_box(self):
         # Get the unique labels and add them to the Combobox.
