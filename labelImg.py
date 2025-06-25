@@ -6,6 +6,7 @@ import os.path
 import platform
 import shutil
 import sys
+import datetime
 import webbrowser as wb
 from functools import partial
 
@@ -105,7 +106,7 @@ class MainWindow(QMainWindow, WindowMixin):
         get_str = lambda str_id: self.string_bundle.get_string(str_id)
         
         # Registration and trial management
-        self.check_registration_and_trial()
+        self.check_license_and_trial()
 
         # Save as Pascal voc xml
         self.default_save_dir = default_save_dir
@@ -246,15 +247,19 @@ class MainWindow(QMainWindow, WindowMixin):
         copy_prev_bounding = action(get_str('copyPrevBounding'), self.copy_previous_bounding_boxes, 'Ctrl+v', 'copy', get_str('copyPrevBounding'))
 
         open_next_image = action(get_str('nextImg'), self.open_next_image, 'd', 'next', get_str('nextImgDetail'))
-        open_next_image2 = action(get_str('nextImg'), self.open_next_image, ']', 'next', get_str('nextImgDetail'))
-
         open_prev_image = action(get_str('prevImg'), self.open_prev_image, 'a', 'prev', get_str('prevImgDetail'))
-        open_prev_image2 = action(get_str('prevImg'), self.open_prev_image, '[', 'prev', get_str('prevImgDetail'))
-        # open_next_image_with_copy = action(get_str('nextImgWithCopy'), self.open_next_image_with_copy,
-        #                          'Shift+d', 'next', get_str('nextImgWithCopyDetail'))
+        # open_next_image_with_copy = action(get_str('nextImgWithCopy'), self.open_next_image_with_copy, 'Shift+d', 'next', get_str('nextImgWithCopyDetail'))
+        
         verify = action(get_str('verifyImg'), self.verify_image, 'space', 'verify', get_str('verifyImgDetail'))
 
         save = action(get_str('save'), self.save_file, 'Ctrl+S', 'save', get_str('saveDetail'), enabled=False)
+
+        """
+        扩展 快捷键
+        1. 增加 `[` 和 `]` 前/后翻页，效果同 `A` 和 `D`
+        """
+        QShortcut(QKeySequence('['), self).activated.connect(self.open_prev_image)
+        QShortcut(QKeySequence(']'), self).activated.connect(self.open_next_image)
 
         def get_format_meta(format):
             """
@@ -321,7 +326,7 @@ class MainWindow(QMainWindow, WindowMixin):
         show_info = action(get_str('info'), self.show_info_dialog, None, 'help', get_str('info'))
         show_shortcut = action(get_str('shortcut'), self.show_shortcuts_dialog, None, 'help', get_str('shortcut'))
         language_switch = action(get_str('languageSwitch'), self.show_language_dialog, None, 'help', get_str('languageSwitchDetail'))
-        registration_code = action(get_str('registrationCode'), self.show_registration_dialog, None, 'help', get_str('registrationCodeDetail'))
+        registration_code = action(get_str('registrationCode'), self.show_license_dialog, None, 'help', get_str('registrationCodeDetail'))
 
         zoom = QWidgetAction(self)
         zoom.setDefaultWidget(self.zoom_widget)
@@ -476,12 +481,12 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.tools = self.toolbar('Tools')
         self.actions.beginner = (
-            open, open_dir, change_save_dir, open_next_image, open_next_image2, open_prev_image, open_prev_image2, verify, save, save_format, None, create, copy, delete, undo, None,
+            open, open_dir, change_save_dir, open_next_image, open_prev_image, verify, save, save_format, None, create, copy, delete, undo, None,
             zoom_in, zoom, zoom_out, fit_window, fit_width, None,
             light_brighten, light, light_darken, light_org)
 
         self.actions.advanced = (
-            open, open_dir, change_save_dir, open_next_image, open_next_image2, open_prev_image, open_prev_image2, save, save_format, None,
+            open, open_dir, change_save_dir, open_next_image, open_prev_image, save, save_format, None,
             create_mode, edit_mode, undo, None,
             hide_all, show_all)
 
@@ -729,10 +734,8 @@ class MainWindow(QMainWindow, WindowMixin):
         #原仓库 https://github.com/tzutalin/labelImg#Hotkeys
         self.show_tutorial_dialog(browser='default', link='https://github.com/Marinerer/labelImg#Hotkeys')
     
-    def check_registration_and_trial(self):
+    def check_license_and_trial(self):
         """检查注册码和试用期"""
-        import datetime
-        
         # 获取注册码
         registration_code = self.settings.get('registration_code', '')
         
@@ -773,7 +776,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 
                 if reply == QMessageBox.Yes:
                     # 用户选择输入授权码
-                    self.show_registration_dialog_on_expired()
+                    self.show_license_dialog_on_expired()
                 else:
                     # 用户选择取消，退出软件
                     self.close()
@@ -854,7 +857,7 @@ class MainWindow(QMainWindow, WindowMixin):
         # 提示重启应用
         QMessageBox.information(self, 'Language Switch', 'Please restart the application for the language change to take effect.')
     
-    def show_registration_dialog(self):
+    def show_license_dialog(self):
         """显示注册码输入对话框"""
         get_str = lambda str_id: self.string_bundle.get_string(str_id)
         
@@ -863,12 +866,11 @@ class MainWindow(QMainWindow, WindowMixin):
                                        QLineEdit.Normal, '')
         
         if ok and text:
-            if self.validate_registration_code(text):
+            if self.validate_license_code(text):
                 # 注册成功
                 self.settings['registration_code'] = text
                 if text == 'mengqing723@qq.com':
                     # 一年期注册码，记录注册日期
-                    import datetime
                     self.settings['registration_date'] = datetime.datetime.now().strftime('%Y-%m-%d')
                 self.settings.save()
                 
@@ -880,7 +882,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 # 注册失败
                 QMessageBox.warning(self, get_str('registrationCode'), get_str('registrationFailed'))
     
-    def show_registration_dialog_on_expired(self):
+    def show_license_dialog_on_expired(self):
         """试用期过期时显示授权码输入对话框"""
         get_str = lambda str_id: self.string_bundle.get_string(str_id)
         
@@ -890,12 +892,11 @@ class MainWindow(QMainWindow, WindowMixin):
                                            QLineEdit.Normal, '')
             
             if ok and text:
-                if self.validate_registration_code(text):
+                if self.validate_license_code(text):
                     # 注册成功
                     self.settings['registration_code'] = text
                     if text == 'mengqing723@qq.com':
                         # 一年期注册码，记录注册日期
-                        import datetime
                         self.settings['registration_date'] = datetime.datetime.now().strftime('%Y-%m-%d')
                     self.settings.save()
                     
@@ -919,7 +920,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.close()
                 sys.exit()
     
-    def validate_registration_code(self, code):
+    def validate_license_code(self, code):
         """验证注册码"""
         valid_codes = ['mengqing723@qq.com', 'mengqing723@gmail.com']
         return code in valid_codes
