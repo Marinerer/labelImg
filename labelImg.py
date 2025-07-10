@@ -941,46 +941,55 @@ class MainWindow(QMainWindow, WindowMixin):
             return
         # 保存编辑前的状态
         self.canvas.save_history_state('edit_label')
-        text = self.label_dialog.pop_up(item.text())
+        
+        # 获取当前选中的形状
+        current_shape = self.items_to_shapes[item]
+        current_points = current_shape.points.copy()
+        
+        # 查找相同坐标的所有标签
+        same_coord_shapes = []
+        current_points_tuple = tuple(tuple([point.x(), point.y()]) for point in current_points)
+        
+        for shape in self.canvas.shapes:
+            shape_points_tuple = tuple(tuple([point.x(), point.y()]) for point in shape.points)
+            if shape_points_tuple == current_points_tuple:
+                same_coord_shapes.append(shape)
+        
+        # 构建默认文本：相同坐标的所有标签用逗号分隔
+        same_coord_labels = [shape.label for shape in same_coord_shapes if shape.label]
+        default_text = ', '.join(same_coord_labels)
+        
+        # 弹出编辑对话框，默认显示相同坐标的所有标签
+        text = self.label_dialog.pop_up(default_text)
+        
         if text is not None:
-            # 获取原始形状
-            original_shape = self.items_to_shapes[item]
+            # 先删除所有相同坐标的形状
+            for shape in same_coord_shapes:
+                if shape in self.canvas.shapes:
+                    self.canvas.shapes.remove(shape)
+                    self.remove_label(shape)
             
-            # 检查是否为多标签
+            # 解析新的标签文本
             if ',' in text:
                 # 多标签：为每个标签创建一个形状
-                labels = [label.strip() for label in text.split(',')]
-                original_points = original_shape.points.copy()  # 保存原始坐标
-                
-                # 先删除原始形状和列表项
-                self.canvas.shapes.remove(original_shape)
-                self.remove_label(original_shape)
-                
-                # 为每个标签创建新形状
-                for i, label in enumerate(labels):
-                    if label:  # 确保标签不为空
-                        new_shape = Shape(label=label, line_color=DEFAULT_LINE_COLOR)
-                        new_shape.points = original_points.copy()  # 使用相同坐标
-                        new_shape.fill_color = generate_color_by_text(label)
-                        new_shape.close()
-                        self.canvas.shapes.append(new_shape)
-                        self.add_label(new_shape)
-                        
-                        # 添加到历史记录
-                        if label not in self.label_hist:
-                            self.label_hist.append(label)
+                labels = [label.strip() for label in text.split(',') if label.strip()]
             else:
-                # 单标签：更新现有形状
-                original_shape.label = text
-                # 使用固定的亮绿色边框
-                original_shape.line_color = DEFAULT_LINE_COLOR
-                original_shape.fill_color = generate_color_by_text(text)
-                item.setText(text)
-                item.setBackground(generate_color_by_text(text))
-                
-                # 添加到历史记录
-                if text not in self.label_hist:
-                    self.label_hist.append(text)
+                # 单标签
+                labels = [text.strip()] if text.strip() else []
+            
+            # 为每个标签创建新形状
+            for label in labels:
+                if label:  # 确保标签不为空
+                    new_shape = Shape(label=label, line_color=DEFAULT_LINE_COLOR)
+                    new_shape.points = current_points.copy()  # 使用相同坐标
+                    new_shape.fill_color = generate_color_by_text(label)
+                    new_shape.close()
+                    self.canvas.shapes.append(new_shape)
+                    self.add_label(new_shape)
+                    
+                    # 添加到历史记录
+                    if label not in self.label_hist:
+                        self.label_hist.append(label)
             
             self.set_dirty()
             self.update_combo_box()
