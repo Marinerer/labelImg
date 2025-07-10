@@ -50,10 +50,12 @@ class LabelDialog(QDialog):
         self.setLayout(layout)
 
     def validate(self):
+        # 检查输入框中的内容是否有效
         if trimmed(self.edit.text()):
             # 提交前重置标签控件状态
             if hasattr(self, 'list_widget'):
                 self.list_widget.clearSelection()
+            # 接受输入
             self.accept()
 
     def post_process(self):
@@ -68,6 +70,18 @@ class LabelDialog(QDialog):
         # 重置标签控件状态
         if hasattr(self, 'list_widget'):
             self.list_widget.clearSelection()
+            
+            # 自动选中下拉列表中对应的项目
+            if text:
+                if ',' in text:  # 多个标签情况
+                    labels = [label.strip() for label in text.split(',') if label.strip()]
+                else:  # 单个标签情况
+                    labels = [text.strip()]
+
+                for i in range(self.list_widget.count()):
+                    item = self.list_widget.item(i)
+                    if item.text() in labels:
+                        item.setSelected(True)
         
         self.edit.setText(text)
         self.edit.setSelection(0, len(text))
