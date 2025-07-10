@@ -101,7 +101,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.os_name = platform.system()
 
         # Load string bundle for i18n
-        saved_language = settings.get('language', 'en') # 默认设置为 'en', 中文=>'zh-CN'
+        saved_language = settings.get('language', 'zh-CN') # 默认设置为 'en', 中文=>'zh-CN'
         self.string_bundle = StringBundle.get_bundle(saved_language)
         get_str = lambda str_id: self.string_bundle.get_string(str_id)
         
@@ -459,7 +459,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.display_label_option.triggered.connect(self.toggle_paint_labels_option)
 
         add_actions(self.menus.file,
-                    (open, open_dir, change_save_dir, open_annotation, copy_prev_bounding, self.menus.recentFiles, save, save_format, save_as, close, reset_all, delete_image, quit))
+                    (open, open_dir, change_save_dir, open_annotation, copy_prev_bounding, self.menus.recentFiles, save, save_as, close, reset_all, delete_image, quit))
         add_actions(self.menus.help, (help_default, show_info, show_shortcut, None, language_switch, registration_code))
         add_actions(self.menus.view, (
             self.auto_saving,
@@ -481,12 +481,12 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.tools = self.toolbar('Tools')
         self.actions.beginner = (
-            open, open_dir, change_save_dir, open_next_image, open_prev_image, verify, save, save_format, None, create, copy, delete, undo, None,
+            open, open_dir, change_save_dir, open_next_image, open_prev_image, verify, save, None, create, copy, delete, undo, None,
             zoom_in, zoom, zoom_out, fit_window, fit_width, None,
             light_brighten, light, light_darken, light_org)
 
         self.actions.advanced = (
-            open, open_dir, change_save_dir, open_next_image, open_prev_image, save, save_format, None,
+            open, open_dir, change_save_dir, open_next_image, open_prev_image, save, None,
             create_mode, edit_mode, undo, None,
             hide_all, show_all)
 
@@ -735,60 +735,20 @@ class MainWindow(QMainWindow, WindowMixin):
         self.show_tutorial_dialog(browser='default', link='https://github.com/Marinerer/labelImg#Hotkeys')
     
     def check_license_and_trial(self):
-        """检查注册码和试用期"""
-        # 获取注册码
-        registration_code = self.settings.get('registration_code', '')
+        # 检查软件是否过期
+        from datetime import datetime
+        current_date = datetime.now()
+        expiry_date = datetime(2025, 12, 30)
         
-        # 检查注册码
-        if registration_code == 'mengqing723@gmail.com':
-            # 永久注册码
-            return True
-        elif registration_code == 'mengqing723@qq.com':
-            # 一年期注册码，检查是否过期
-            registration_date = self.settings.get('registration_date', '')
-            if registration_date:
-                try:
-                    reg_date = datetime.datetime.strptime(registration_date, '%Y-%m-%d')
-                    if datetime.datetime.now() - reg_date < datetime.timedelta(days=365):
-                        return True
-                except:
-                    pass
-        
-        # 检查试用期
-        first_run_date = self.settings.get('first_run_date', '')
-        if not first_run_date:
-            # 首次运行，记录日期
-            first_run_date = datetime.datetime.now().strftime('%Y-%m-%d')
-            self.settings['first_run_date'] = first_run_date
-            self.settings.save()
-        
-        try:
-            first_date = datetime.datetime.strptime(first_run_date, '%Y-%m-%d')
-            days_passed = (datetime.datetime.now() - first_date).days
-            
-            if days_passed >= 30:
-                # 试用期已过期，弹出确认对话框
-                get_str = lambda str_id: self.string_bundle.get_string(str_id)
-                reply = QMessageBox.question(self, get_str('trialMode'), 
-                                            get_str('trialExpired').replace('\\n', '\n'),
-                                            QMessageBox.Yes | QMessageBox.No,
-                                            QMessageBox.Yes)
-                
-                if reply == QMessageBox.Yes:
-                    # 用户选择输入授权码
-                    self.show_license_dialog_on_expired()
-                else:
-                    # 用户选择取消，退出软件
-                    self.close()
-                    sys.exit()
-            else:
-                # 显示试用期剩余天数
-                remaining_days = 30 - days_passed
-                get_str = lambda str_id: self.string_bundle.get_string(str_id)
-                # self.setWindowTitle(f"{__appname__} - {get_str('trialMode')} ({get_str('trialRemaining').format(remaining_days)})")
-                self.setWindowTitle(f"{__appname__} - ({get_str('trialRemaining').format(remaining_days)})")
-        except:
-            pass
+        if current_date > expiry_date:
+            # 创建临时应用程序以显示消息框
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Warning)
+            msg_box.setWindowTitle("温馨提示")
+            msg_box.setText("抱歉，软件过期无法使用！请联系管理员。")
+            msg_box.setStandardButtons(QMessageBox.Ok)
+            msg_box.exec_()
+            sys.exit(0)
     
     def show_language_dialog(self):
         """显示语言切换对话框"""
