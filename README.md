@@ -164,7 +164,23 @@ labelImg
 labelImg [IMAGE_PATH] [PRE-DEFINED CLASS FILE]
 ```
 
+## 手动构建
 
+1. 打开 ` Anaconda Prompt` 环境，进入项目目录
+2. 删除已构建目录
+  ```
+  rm -rf build
+  rm -rf dist
+  ```
+3. 运行构建命令
+  ```
+  pyrcc5 -o libs/resources.py resources.qrc
+  pyinstaller labelImg.spec
+  ```
+
+## 重置软件
+1. 删除已构建目录
+2. 删除用户配置文件 `~/.labelImgSettings.pkl`
 
 ## License
 
