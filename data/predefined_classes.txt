@@ -1,9 +1,9 @@
 people
 nohelmet
 nofgy
-fire
-smoke
 phone
+smoke
+fire
 smoking
 guanyong
 jscj
@@ -12,3 +12,7 @@ clmd
 clnpb
 clepb
 cp
+mud
+throw
+fall
+ZTC

@@ -99,20 +99,20 @@ if current_dir not in sys.path:
 3. 清理旧文件
 4. 执行打包
 
-## 使用方法
+#### 使用方法
 
-### Windows
+##### Windows
 ```cmd
 build.bat
 ```
 
-### Linux/Mac
+##### Linux/Mac
 ```bash
 chmod +x build.sh
 ./build.sh
 ```
 
-### 手动构建
+##### 手动构建
 ```bash
 pyinstaller labelImg.spec
 ```
